@@ -1,0 +1,12 @@
+# Normalize line endings — keep source files LF across platforms.
+* text=auto eol=lf
+
+# Binary files (no normalization)
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+*.pdf binary
