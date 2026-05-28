@@ -1,24 +1,64 @@
-import Link from "next/link";
-import { Logo } from "@/components/ui/logo";
+import { redirect } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentProfile } from "@/lib/supabase/get-user";
+import { OnboardingFlow, type ChapterRow, type InitialData } from "./onboarding-flow";
 
-// Onboarding is per-user; never prerender.
+// Per-user; never prerender.
 export const dynamic = "force-dynamic";
 
-// Phase 4 builds the full 7-step onboarding per PRD §1.0.2.
-export default function OnboardingPage() {
+export default async function OnboardingPage() {
+  const profile = await getCurrentProfile();
+
+  // Middleware guarantees auth — if profile is somehow missing, send back home.
+  if (!profile) {
+    redirect("/login");
+  }
+
+  // Already done? Skip to the app.
+  if (profile.onboarding_completed_at) {
+    redirect("/today");
+  }
+
+  // Pre-fetch the master chapter list for step 6.
+  const supabase = getSupabaseServerClient();
+  const { data: chaptersRaw } = await supabase
+    .from("chapters")
+    .select("id, subject, name, chapter_order")
+    .order("subject", { ascending: true })
+    .order("chapter_order", { ascending: true })
+    .returns<
+      Array<{
+        id: string;
+        subject: "physics" | "chemistry" | "maths";
+        name: string;
+        chapter_order: number | null;
+      }>
+    >();
+
+  const chapters: ChapterRow[] = (chaptersRaw ?? []).map((c) => ({
+    id: c.id,
+    subject: c.subject,
+    name: c.name,
+    chapter_order: c.chapter_order,
+  }));
+
+  // Hydrate the wizard with anything we already know — lets the user resume.
+  const initialData: InitialData = {
+    goal: profile.goal,
+    examDate: profile.exam_date,
+    currentClass: profile.current_class,
+    coachType: profile.coach_type,
+    coachingName: profile.coaching_name,
+    batch: profile.batch,
+    hoursWeekday: profile.daily_hours_weekday,
+    hoursWeekend: profile.daily_hours_weekend,
+    sameDailyTarget: profile.same_daily_target,
+    windows: profile.time_windows ?? [],
+  };
+
+  const initialStep = Math.min(7, Math.max(1, profile.onboarding_current_step ?? 1));
+
   return (
-    <div className="mx-auto flex min-h-screen max-w-[680px] flex-col items-center justify-center px-6">
-      <Logo size={24} className="mb-8" />
-      <div className="glass w-full text-center" style={{ padding: 56 }}>
-        <h1 className="t-h2 mb-3">Let&apos;s build your prep plan</h1>
-        <p className="t-body secondary mb-6">
-          7-step onboarding lands in Phase 4. It captures: goal, exam date, class, coaching, daily
-          hours, time windows, and chapters already studied.
-        </p>
-        <Link href="/today" className="btn btn-ghost">
-          Skip to app preview →
-        </Link>
-      </div>
-    </div>
+    <OnboardingFlow chapters={chapters} initialStep={initialStep} initialData={initialData} />
   );
 }

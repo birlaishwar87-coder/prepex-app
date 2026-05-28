@@ -72,7 +72,7 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 - [x] **Phase 1** — Project setup, design tokens, base components, routing skeleton
 - [x] **Phase 2** — Supabase schema + RLS + migrations (12 tables, 18 enums, 4 trigger functions, 54 seed chapters)
 - [x] **Phase 3** — Auth (Google OAuth + email/password). Phone OTP deferred
-- [ ] **Phase 4** — Onboarding flow (7 steps)
+- [x] **Phase 4** — Onboarding flow (7 steps, resume-from-step, chapter seeding)
 - [ ] **Phase 5** — Groq integration + plan generation engine
 - [ ] **Phase 6** — Daily Plan home
 - [ ] **Phase 7** — Revision Scheduler
@@ -229,5 +229,31 @@ Before Google OAuth works:
 
 - **`first_name` arrives via `raw_user_meta_data`** on signup; the `handle_new_user` trigger picks it up. Don't try to INSERT a profile row from app code.
 - **Phone is stored on profile but NOT used as auth method** in V1 — collected for partner matching / parent connection per PRD §1.0.2.
-- **Email confirmation flow**: if "Confirm email" is ON in Supabase, the signup action returns success but session isn't established until the user clicks the confirm link. Phase 4 onboarding will gracefully handle a returning-from-email user.
+- **Auto-confirm via service role** — the signup action calls `admin.auth.admin.updateUserById(id, { email_confirm: true })` then signs the user in immediately. DEV CONVENIENCE — revisit before prod launch if you want real email verification. Set `AUTO_CONFIRM_EMAIL` env or strip the admin call when hardening.
 - **`auth.uid()` everywhere** for RLS. All server-side reads go through `getSupabaseServerClient()` so cookies → session → uid flows correctly.
+
+## Onboarding (Phase 4)
+
+### Flow
+- Server `app/onboarding/page.tsx` loads profile + chapters, picks up where the user left off (`onboarding_current_step`). Already done? Redirect to `/today`.
+- Client `onboarding-flow.tsx` is the 7-step state machine — every step calls a server action that persists and advances `onboarding_current_step` before client moves to next step.
+- Step 6 batch-upserts `user_topic_state` rows for every chapter the user marked: `phase='in_revision'`, `next_revision_due = today + 7d`, `current_interval_days=7`, `onboarding_marked=true` (per PRD §2.2.3).
+- Step 7 sets `onboarding_completed_at` and `redirect('/today')` after a ~6.5s neural-viz loading sequence (UX matches `onboarding.jsx`).
+
+### Files
+```
+app/onboarding/
+  page.tsx                Server — guards + pre-fetches chapters
+  onboarding-flow.tsx     Client — 7-step state machine with all step UIs
+  actions.ts              saveGoalAction, saveExamAction, saveCoachingAction,
+                          saveHoursAction, saveTopicsAction, completeOnboardingAction
+```
+
+### Invariants
+
+- **Resume is server-driven**: client reads `initialStep` + `initialData` from server props, never localStorage. If a user clears cookies and re-logs-in, they pick back up at the right step.
+- **Chronotype + day_boundary are DERIVED** in `saveHoursAction` from selected time windows, not user input. Day → 5 AM, Night → 12 PM noon, Mixed → 6 AM (PRD §1.2.2 locked).
+- **Chapter seeding is idempotent** — `ON CONFLICT (user_id, chapter_id, topic) DO NOTHING`. Re-onboarding doesn't double-seed.
+- **`(profile data).update(...)` requires `as never` cast** to work around a postgrest-js v2.x generic-inference glitch. Use the `updateProfile()` helper in `actions.ts` — it preserves `TablesUpdate<'profiles'>` type-safety at the call site.
+- **Step 4 coaching upload is a UI stub** (PHASE_2). The "Coming soon" button never uploads. Real upload + OCR ships when PRD §1.0.2 step 4 lands fully.
+- **Late-night signup behavior (PRD §1.0.4)** is NOT enforced here — Phase 5 (plan generation) reads `onboarding_completed_at` vs `day_boundary_time` to decide "today" vs "tomorrow" first-plan target.
