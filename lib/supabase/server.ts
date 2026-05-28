@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import type { Database } from "./database.types";
 
 // Auth-scoped server client — reads the user from cookies. Use this in
 // Server Components, Route Handlers, and Server Actions where you want
@@ -17,7 +18,7 @@ export function getSupabaseServerClient() {
 
   const cookieStore = cookies();
 
-  return createServerClient(url, anonKey, {
+  return createServerClient<Database>(url, anonKey, {
     cookies: {
       get(name: string) {
         return cookieStore.get(name)?.value;
@@ -54,7 +55,7 @@ export function getSupabaseAdminClient() {
     );
   }
 
-  return createServerClient(url, serviceKey, {
+  return createServerClient<Database>(url, serviceKey, {
     cookies: { get: () => undefined, set: () => {}, remove: () => {} },
   });
 }

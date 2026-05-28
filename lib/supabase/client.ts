@@ -1,4 +1,5 @@
 import { createBrowserClient } from "@supabase/ssr";
+import type { Database } from "./database.types";
 
 export function getSupabaseBrowserClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -10,5 +11,7 @@ export function getSupabaseBrowserClient() {
     );
   }
 
-  return createBrowserClient(url, anonKey);
+  // Typed against the generated Database schema — all .from('xxx') calls
+  // get auto-completion and type-checked row/insert/update shapes.
+  return createBrowserClient<Database>(url, anonKey);
 }
