@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { Logo } from "@/components/ui/logo";
 
+// Onboarding is per-user; never prerender.
+export const dynamic = "force-dynamic";
+
 // Phase 4 builds the full 7-step onboarding per PRD §1.0.2.
 export default function OnboardingPage() {
   return (

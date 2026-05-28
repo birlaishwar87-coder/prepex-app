@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import type { Database } from "./database.types";
 
+type CookieToSet = { name: string; value: string; options: CookieOptions };
+
 // Auth-scoped server client — reads the user from cookies. Use this in
 // Server Components, Route Handlers, and Server Actions where you want
 // RLS to apply with the user's session.
@@ -20,22 +22,18 @@ export function getSupabaseServerClient() {
 
   return createServerClient<Database>(url, anonKey, {
     cookies: {
-      get(name: string) {
-        return cookieStore.get(name)?.value;
+      getAll() {
+        return cookieStore.getAll();
       },
-      set(name: string, value: string, options: CookieOptions) {
+      setAll(cookiesToSet: CookieToSet[]) {
         try {
-          cookieStore.set({ name, value, ...options });
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options)
+          );
         } catch {
           // Called from a Server Component — cookies are read-only there.
-          // Setting happens in Route Handlers / Server Actions.
-        }
-      },
-      remove(name: string, options: CookieOptions) {
-        try {
-          cookieStore.set({ name, value: "", ...options });
-        } catch {
-          // See note above.
+          // Setting happens in Route Handlers / Server Actions, where the
+          // request is mutable. Safe to swallow here.
         }
       },
     },
@@ -56,6 +54,9 @@ export function getSupabaseAdminClient() {
   }
 
   return createServerClient<Database>(url, serviceKey, {
-    cookies: { get: () => undefined, set: () => {}, remove: () => {} },
+    cookies: {
+      getAll: () => [],
+      setAll: () => {},
+    },
   });
 }

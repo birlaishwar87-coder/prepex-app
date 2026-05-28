@@ -5,10 +5,10 @@ import { MobileBottomNav } from "./mobile-bottom-nav";
 interface AppShellProps {
   children: ReactNode;
   rightPanel?: ReactNode;
-  /** Phase 1 stub — Phase 3 wires real user data. */
   streak?: number;
   userName?: string;
   userMeta?: string;
+  signedIn?: boolean;
 }
 
 /**
@@ -21,10 +21,11 @@ export function AppShell({
   streak,
   userName,
   userMeta,
+  signedIn,
 }: AppShellProps) {
   return (
     <>
-      <Sidebar streak={streak} userName={userName} userMeta={userMeta} />
+      <Sidebar streak={streak} userName={userName} userMeta={userMeta} signedIn={signedIn} />
       <MobileBottomNav />
       <main className="prepex-main min-h-screen pl-[240px] pr-10 pt-8 pb-16 flex gap-8">
         <div className="flex-1 max-w-[800px] min-w-0">{children}</div>
@@ -36,7 +37,7 @@ export function AppShell({
             .prepex-right { display: none; }
           }
           @media (max-width: 860px) {
-            .prepex-main { padding-left: 16px; padding-right: 16px; padding-bottom: 88px; }
+            .prepex-main { margin-left: 0; padding-left: 16px; padding-right: 16px; padding-bottom: 88px; }
           }
         `}</style>
       </main>

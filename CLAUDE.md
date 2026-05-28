@@ -71,7 +71,7 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 
 - [x] **Phase 1** — Project setup, design tokens, base components, routing skeleton
 - [x] **Phase 2** — Supabase schema + RLS + migrations (12 tables, 18 enums, 4 trigger functions, 54 seed chapters)
-- [ ] **Phase 3** — Auth (Google + email/phone)
+- [x] **Phase 3** — Auth (Google OAuth + email/password). Phone OTP deferred
 - [ ] **Phase 4** — Onboarding flow (7 steps)
 - [ ] **Phase 5** — Groq integration + plan generation engine
 - [ ] **Phase 6** — Daily Plan home
@@ -180,3 +180,54 @@ NEXT_PUBLIC_SUPABASE_URL=https://pqjufzuljwiujvzlqdlf.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_lYUjDxhnBHspx1B1sfJSMg_vJJqEk8e
 SUPABASE_SERVICE_ROLE_KEY=  # Dashboard → Settings → API → service_role (secret)
 ```
+
+## Auth (Phase 3)
+
+### Flow
+- `/signup` → Google OAuth or email/password. Email/password collects `first_name` + phone; phone goes onto profile (NOT used as auth method — phone OTP deferred per founder decision).
+- `/login` → Google OAuth or email/password.
+- Server actions in `app/(auth)/login/actions.ts` and `app/(auth)/signup/actions.ts` call `supabase.auth.signInWithPassword` / `signUp`.
+- OAuth callback at `/auth/callback` exchanges code → session, then routes to `/onboarding` (no `onboarding_completed_at`) or `/today`.
+- Signout at `/auth/signout` (POST only) → redirects to `/`.
+- Middleware (`middleware.ts` + `lib/supabase/middleware.ts`) refreshes session every request, redirects unauth → `/login` for protected routes, redirects auth → `/today` from `/login`+`/signup`.
+
+### Files added in Phase 3
+```
+middleware.ts                          Root middleware — calls updateSession
+lib/supabase/middleware.ts             updateSession helper (getAll/setAll cookie pattern)
+lib/supabase/get-user.ts               getCurrentUser, getCurrentProfile — React-cached per request
+
+app/(auth)/layout.tsx                  Shared auth shell (back-home link, footer)
+app/(auth)/signup/page.tsx             Server page
+app/(auth)/signup/signup-form.tsx      Client form ('use client')
+app/(auth)/signup/actions.ts           Server action signupAction
+app/(auth)/login/page.tsx              Server page
+app/(auth)/login/login-form.tsx        Client form
+app/(auth)/login/actions.ts            Server action loginAction
+
+app/auth/callback/route.ts             OAuth code exchange
+app/auth/signout/route.ts              POST signout
+
+components/auth/google-button.tsx      Reusable Google OAuth CTA
+
+app/(app)/layout.tsx                   Now async — pulls profile via getCurrentProfile,
+                                        passes name + streak to AppShell.
+                                        `export const dynamic = 'force-dynamic'`.
+components/layout/sidebar.tsx          Renders Sign-out form when signedIn=true
+components/layout/app-shell.tsx        signedIn prop forwarded to Sidebar
+```
+
+### Manual Supabase dashboard config (Ishwar)
+
+Before Google OAuth works:
+1. **Authentication → URL Configuration → Site URL** = `http://localhost:3000` (dev) / production URL when deploying
+2. **Authentication → URL Configuration → Redirect URLs** add: `http://localhost:3000/auth/callback`
+3. **Authentication → Providers → Google** → enable; paste OAuth credentials from a Google Cloud OAuth web client. Redirect URI to paste into Google Cloud: `https://pqjufzuljwiujvzlqdlf.supabase.co/auth/v1/callback`
+4. **Email/password** is enabled by default. To skip email-confirmation for local testing: **Authentication → Sign in/up → Email** → turn OFF "Confirm email". Keep ON for production.
+
+### Auth invariants
+
+- **`first_name` arrives via `raw_user_meta_data`** on signup; the `handle_new_user` trigger picks it up. Don't try to INSERT a profile row from app code.
+- **Phone is stored on profile but NOT used as auth method** in V1 — collected for partner matching / parent connection per PRD §1.0.2.
+- **Email confirmation flow**: if "Confirm email" is ON in Supabase, the signup action returns success but session isn't established until the user clicks the confirm link. Phase 4 onboarding will gracefully handle a returning-from-email user.
+- **`auth.uid()` everywhere** for RLS. All server-side reads go through `getSupabaseServerClient()` so cookies → session → uid flows correctly.

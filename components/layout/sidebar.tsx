@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Flame, Home, Inbox, MessageSquare, RefreshCw, Settings } from "lucide-react";
+import { Calendar, Flame, Home, Inbox, LogOut, MessageSquare, RefreshCw, Settings } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -24,16 +24,18 @@ const NAV: NavItem[] = [
 ];
 
 interface SidebarProps {
-  /** Stub values for Phase 1 — real values come from DB in Phase 6+. */
   streak?: number;
   userName?: string;
   userMeta?: string;
+  /** When provided, sidebar shows the user chip + Sign out button. */
+  signedIn?: boolean;
 }
 
 export function Sidebar({
   streak = 0,
   userName = "Sign in",
   userMeta = "Set up your profile",
+  signedIn = false,
 }: SidebarProps) {
   const pathname = usePathname();
 
@@ -130,24 +132,53 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* User chip */}
-      <div
-        className="mt-3 flex items-center gap-2.5 rounded-[10px] px-3 py-2.5"
-        style={{
-          background: "rgba(255,255,255,0.025)",
-          border: "1px solid var(--border-default)",
-        }}
-      >
+      {/* User chip + signout */}
+      <div className="mt-3 flex flex-col gap-2">
         <div
-          className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
-          style={{ background: "linear-gradient(135deg, #4C1D95, #FF7A59)" }}
+          className="flex items-center gap-2.5 rounded-[10px] px-3 py-2.5"
+          style={{
+            background: "rgba(255,255,255,0.025)",
+            border: "1px solid var(--border-default)",
+          }}
         >
-          {userName.slice(0, 1).toUpperCase()}
+          <div
+            className="flex h-[30px] w-[30px] flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+            style={{ background: "linear-gradient(135deg, #4C1D95, #FF7A59)" }}
+          >
+            {userName.slice(0, 1).toUpperCase()}
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-cream">{userName}</div>
+            <div className="text-[11px] text-text-tertiary">{userMeta}</div>
+          </div>
         </div>
-        <div className="min-w-0 flex-1">
-          <div className="truncate text-sm font-semibold text-cream">{userName}</div>
-          <div className="text-[11px] text-text-tertiary">{userMeta}</div>
-        </div>
+
+        {signedIn && (
+          <form action="/auth/signout" method="post">
+            <button
+              type="submit"
+              className="flex w-full items-center justify-center gap-2 rounded-[10px] px-3 py-2 text-[12.5px] font-medium transition-all duration-200"
+              style={{
+                background: "rgba(255,255,255,0.02)",
+                border: "1px solid var(--border-default)",
+                color: "var(--text-tertiary)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "rgba(239, 68, 68, 0.08)";
+                e.currentTarget.style.borderColor = "rgba(239, 68, 68, 0.3)";
+                e.currentTarget.style.color = "#FCA5A5";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "rgba(255,255,255,0.02)";
+                e.currentTarget.style.borderColor = "var(--border-default)";
+                e.currentTarget.style.color = "var(--text-tertiary)";
+              }}
+            >
+              <LogOut size={13} />
+              Sign out
+            </button>
+          </form>
+        )}
       </div>
 
       <style>{`
