@@ -38,10 +38,9 @@ The app boots without any env vars filled in — Supabase + Groq clients fail lo
 | 5 | Groq plan-generation engine | ✅ Done |
 | 6 | Daily Plan home (real UX) | ✅ Done |
 | 7 | Revision Scheduler (algorithm + session UI) | ✅ Done |
-| 8 | Backlog Management (decay, health, Recovery Mode) | ⏳ Next |
-| 8 | Backlog Management | ⏳ |
-| 9 | AI Chat | ⏳ |
-| 10 | Settings + polish | ⏳ |
+| 8 | Backlog Management (decay, health, Recovery Mode) | ✅ Done |
+| 9 | AI Chat (Groq plan adjustments) | ✅ Done |
+| 10 | Settings + empty/loading/error states + polish | ⏳ Next |
 | 11 | Mixpanel wiring + deploy prep | ⏳ |
 
 ## Routes (Phase 1 skeleton)
