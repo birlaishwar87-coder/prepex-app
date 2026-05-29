@@ -1,26 +1,27 @@
-import { Pill } from "@/components/ui/pill";
+import { getCurrentProfile } from "@/lib/supabase/get-user";
+import { ChatClient } from "./chat-client";
 
-export default function ChatPage() {
-  return (
-    <div>
-      <div className="mb-8 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="t-h1 mb-2">AI Chat</h1>
-          <p className="t-body secondary">
-            Open chat that adjusts your plan — coming in Phase 9.
-          </p>
-        </div>
-        <Pill variant="purple">Phase 9</Pill>
-      </div>
+export default async function ChatPage() {
+  const profile = await getCurrentProfile();
+  const firstName = profile?.first_name?.trim() || "friend";
 
-      <div className="glass" style={{ padding: 32 }}>
-        <h2 className="t-h3 mb-3">What lands here in Phase 9</h2>
-        <ul className="space-y-2 text-sm secondary">
-          <li>• Groq-powered chat (llama-3.3-70b-versatile) for plan adjustments</li>
-          <li>• &quot;I have a mock in 5 days&quot; / &quot;I&apos;m overwhelmed&quot; → plan regenerates with context</li>
-          <li>• All chat happens through a server route — GROQ_API_KEY never leaves the server</li>
-        </ul>
-      </div>
-    </div>
-  );
+  // Tailored greeting based on time of day in user's TZ — small touch.
+  const hours = new Date().toLocaleString("en-US", {
+    timeZone: profile?.timezone ?? "Asia/Kolkata",
+    hour: "2-digit",
+    hour12: false,
+  });
+  const h = parseInt(hours, 10);
+  const greeting =
+    h < 5
+      ? `Late one tonight, ${firstName}.`
+      : h < 12
+      ? `Morning, ${firstName}.`
+      : h < 17
+      ? `Hey ${firstName}.`
+      : h < 21
+      ? `Evening, ${firstName}.`
+      : `Hi ${firstName}.`;
+
+  return <ChatClient greeting={greeting} />;
 }

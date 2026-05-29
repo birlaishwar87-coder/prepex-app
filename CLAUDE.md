@@ -76,9 +76,8 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 - [x] **Phase 5** — Groq plan-generation engine + /api/plan/generate + minimal /today wire-up
 - [x] **Phase 6** — Daily Plan home (real UX with check-in, task cards, regenerate, Bad Day, right panel)
 - [x] **Phase 7** — Revision Scheduler (interval engine, phase transitions, /revision queue, shared RevisionSession)
-- [ ] **Phase 7** — Revision Scheduler
-- [ ] **Phase 8** — Backlog Management
-- [ ] **Phase 9** — AI Chat
+- [x] **Phase 8** — Backlog Management (/backlog with health tiers, recovery mode, manual add, first-7-days hide)
+- [x] **Phase 9** — AI Chat (/chat with Groq llama-3.3, context-aware reply, ephemeral history)
 - [ ] **Phase 10** — Settings + empty/loading/error states + polish
 - [ ] **Phase 11** — Mixpanel wiring + final QA + deploy prep
 
@@ -411,3 +410,88 @@ app/(app)/today/
 - **Question bank for recall step** (PRD §2.5.2 step 1) — not in V1. Self-quiz textarea replaces it.
 - **Curated resource links per revision** (PRD §18) — full Phase 2 of business roadmap.
 - **Skipped 3+ times = Disengagement signal** (PRD §2.5.3 last bullet) — recorded but signal aggregation lands later.
+
+## Backlog Management (Phase 8)
+
+`/backlog` UI + the streak protection during Recovery Mode (PRD §11).
+
+### File map
+
+```
+app/(app)/backlog/
+  page.tsx                Server — first-7-days gate, fetch + decorate items,
+                           compute Health tier + Recovery state.
+  backlog-client.tsx      Client — Priority / User-added / Other / Held groups +
+                           AddBacklogModal + RecoveryModePrompt + RecoveryModeBanner.
+  actions.ts              addBacklogItemsAction, holdBacklogItemAction,
+                           resumeBacklogItemAction, skipBacklogItemAction,
+                           addBacklogToTodayPlanAction, acknowledgeHeldNudgeAction,
+                           enterBacklogRecoveryAction, exitBacklogRecoveryAction.
+  components/
+    health-indicator.tsx     4-tier label + computeHealthTier() (PRD §11.4).
+    recovery-mode-prompt.tsx Shown at ≥25 backlog when not in recovery.
+    recovery-mode-banner.tsx Active-recovery banner with "End Recovery Mode".
+    backlog-row.tsx          Per-item row with Add-to-plan / Hold / Skip + held-nudge.
+    add-backlog-modal.tsx    Chapter picker grouped by subject + priority radio.
+
+app/(app)/today/page.tsx  Streak reset on Bad Day SKIPPED when an active
+                          recovery_modes row exists (PRD §11.5.2).
+```
+
+### Locked invariants
+
+- **First 7 days hide** (PRD §11.8) — `account_age_days < 7` → "Building your rhythm" placeholder.
+  Items still computed silently for AI planning, never surfaced.
+- **Priority weight computed live** from `original_date`, `last_reviewed_at`, and `state`/`priority`
+  via `lib/utils/backlog-priority.ts`. Never stored — it drifts daily.
+- **Recovery Mode is student-initiated only** (PRD §11.5, §11.10). The prompt shows at ≥25 active
+  items; the student decides. Code never auto-enters.
+- **End Recovery Mode button always visible** while active (PRD §11.5.2 locked trust feature).
+- **Streak protection during recovery** — the Bad Day trigger on /today skips `streak_count = 0`
+  when any recovery is active.
+- **Add-to-plan uses state='redistributed'** to preserve audit. Skip permanently uses `DELETE`.
+- **Held-nudge fires once** — 7 days after `held_since`, single soft prompt with "Hold longer"
+  acknowledge action. After acknowledge, `nudge_sent=true` and it never re-shows.
+- **Health tier thresholds** aligned with Recovery prompt threshold (25+) — both inflect at the
+  same point so the UI tells a coherent story.
+
+### Stubs deferred
+
+- **Backlog count badge in Sidebar** — still hard-coded "8" in the design; Phase 10 polish wires
+  the real count (and hides it for accounts < 7 days old).
+- **Auto-exit recovery at <10 backlog** (PRD §11.5.2) — manual exit works; auto-exit happens at
+  the next plan-gen if we encode it into the system prompt rule 3a. Phase 10.
+- **Old-items bulk purge at 100+** (PRD §11.9 edge case) — not in V1.
+
+## AI Chat (Phase 9)
+
+Open chat at `/chat`. Calls Groq `llama-3.3-70b-versatile` with a brand-strict older-sibling system prompt and a JSON context snapshot of the student's current state.
+
+### File map
+
+```
+lib/groq/chat.ts            CHAT_SYSTEM_PROMPT (locked) + sendChatMessage helper.
+app/(app)/chat/
+  page.tsx                  Server — friendly time-of-day greeting only.
+  chat-client.tsx           Client — message list, composer, 4 suggested prompts,
+                             auto-scroll, thinking-dots, "Regenerate" link to /today.
+  actions.ts                sendChatTurnAction — builds context (profile, today's plan,
+                             checkin, streak, recovery, backlog count, days_to_exam),
+                             calls Groq with last 6 turns of history, returns reply text.
+```
+
+### Locked invariants
+
+- **Chat is for EXECUTION, never CONTENT** — system prompt forbids academic answers.
+  If asked for a formula or NCERT topic, the AI redirects: "I'd point you to your NCERT for that
+  one — I'm here for the plan side."
+- **Same banlist as plan generation** — "warrior", "champion", "conquer", "crush", "behind",
+  "must", "should", motivational quotes. Plus ALL-CAPS and multi-`!`.
+- **Context snapshot prepended** to every user turn in `[CONTEXT]…[/CONTEXT]` wrapping so the
+  model can be specific without us doing a system-message reshuffle per turn.
+- **Ephemeral conversation** — V1 keeps history in client state only. Refresh clears.
+  Phase 11 can persist if we want continuity.
+- **History clamped to last 6 turns** in the API call to keep latency low.
+- **Regenerate is NOT triggered by the model** — there's a "Regenerate" link in the composer
+  that takes the user to /today (where the reason-capture modal lives). The model can suggest
+  hitting it in text.
