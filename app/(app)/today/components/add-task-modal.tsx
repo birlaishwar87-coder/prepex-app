@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { ChevronDown, Minus, Plus, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { addCustomTaskAction, addTaskInitial } from "../actions";
+import { addCustomTaskAction, type AddTaskState } from "../actions";
+
+const addTaskInitial: AddTaskState = { error: null };
 
 const SUBJECTS = ["physics", "chemistry", "maths", "revision", "wellness"] as const;
 const TASK_TYPES = [

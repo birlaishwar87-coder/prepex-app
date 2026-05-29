@@ -110,6 +110,36 @@ export default async function TodayPage() {
   // completion percentage that day.
   const heatmap = await buildHeatmap(user.id, planDate);
 
+  // ---- Topic-state map for routing /today revision tasks ----
+  // Build chapter_id → topic_state_id and chapter_id → chapter meta.
+  const { data: topicStates } = await supabase
+    .from("user_topic_state")
+    .select("id, chapter_id, chapters(name, subject)")
+    .eq("user_id", user.id)
+    .eq("phase", "in_revision")
+    .returns<
+      Array<{
+        id: string;
+        chapter_id: string;
+        chapters: { name: string; subject: "physics" | "chemistry" | "maths" } | null;
+      }>
+    >();
+
+  const revisionTopicStateByChapter: Record<string, string> = {};
+  const chapterMetaById: Record<
+    string,
+    { name: string; subject: "physics" | "chemistry" | "maths" }
+  > = {};
+  for (const row of topicStates ?? []) {
+    revisionTopicStateByChapter[row.chapter_id] = row.id;
+    if (row.chapters) {
+      chapterMetaById[row.chapter_id] = {
+        name: row.chapters.name,
+        subject: row.chapters.subject,
+      };
+    }
+  }
+
   // ---- Tomorrow preview ----
   const tomorrow = addDays(planDate, 1);
   const { data: tomorrowPlan } = await supabase
@@ -240,6 +270,8 @@ export default async function TodayPage() {
             fallbackReason={
               "fallback" in result && result.fallback ? result.fallbackReason : null
             }
+            revisionTopicStateByChapter={revisionTopicStateByChapter}
+            chapterMetaById={chapterMetaById}
           />
         );
       }
@@ -260,6 +292,8 @@ export default async function TodayPage() {
       checkin={checkin}
       showDay2Explainer={showDay2Explainer}
       rightPanelData={rightPanelData}
+      revisionTopicStateByChapter={revisionTopicStateByChapter}
+      chapterMetaById={chapterMetaById}
       fallback={generationFallback}
       fallbackReason={generationFallbackReason}
     />
@@ -282,6 +316,8 @@ function TodayPageRenderer(props: {
   rightPanelData: RightPanelData;
   fallback: boolean;
   fallbackReason: string | null;
+  revisionTopicStateByChapter: Record<string, string>;
+  chapterMetaById: Record<string, { name: string; subject: "physics" | "chemistry" | "maths" }>;
 }) {
   return (
     <div className="grid gap-7 xl:grid-cols-[1fr_320px]">
@@ -300,6 +336,8 @@ function TodayPageRenderer(props: {
           showDay2Explainer={props.showDay2Explainer}
           fallback={props.fallback}
           fallbackReason={props.fallbackReason}
+          revisionTopicStateByChapter={props.revisionTopicStateByChapter}
+          chapterMetaById={props.chapterMetaById}
         />
       </div>
       <aside className="hidden xl:block">

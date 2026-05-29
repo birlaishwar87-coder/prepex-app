@@ -70,9 +70,9 @@ async function resolvePlanDate(userId: string): Promise<string> {
 // ============================================================
 // Check-in (PRD §3)
 // ============================================================
+// Note: a "use server" file can only export async functions. Initial-state
+// constants live in the client modal components themselves, NOT here.
 export type CheckinState = { error: string | null };
-const checkinInitial: CheckinState = { error: null };
-void checkinInitial; // exported via type only
 
 const VALID_RESPONSES: CheckinResponse[] = ["drained", "heavy", "steady", "good", "strong"];
 
@@ -205,7 +205,6 @@ export async function toggleTaskCompletedAction(taskId: string): Promise<{ error
 // Regenerate plan with reason capture (PRD §1.3.4)
 // ============================================================
 export type RegenerateState = { error: string | null; fallback?: boolean };
-export const regenerateInitial: RegenerateState = { error: null };
 
 export async function regeneratePlanAction(
   _prev: RegenerateState,
@@ -233,7 +232,6 @@ export async function regeneratePlanAction(
 // Add custom task (PRD §1.4.2)
 // ============================================================
 export type AddTaskState = { error: string | null };
-export const addTaskInitial: AddTaskState = { error: null };
 
 const VALID_SUBJECTS: Subject[] = ["physics", "chemistry", "maths", "revision", "wellness"];
 const VALID_TASK_TYPES: TaskType[] = [

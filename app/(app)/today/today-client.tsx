@@ -10,6 +10,10 @@ import { TaskDetailModal } from "./components/task-detail-modal";
 import { AddTaskModal } from "./components/add-task-modal";
 import { RegenerateModal } from "./components/regenerate-modal";
 import { FallbackBanner } from "./components/fallback-banner";
+import {
+  RevisionSession,
+  type RevisionTarget,
+} from "../revision/components/revision-session";
 
 type Task = Tables<"tasks">;
 
@@ -25,6 +29,11 @@ interface TodayClientProps {
   showDay2Explainer: boolean;
   fallback: boolean;
   fallbackReason: string | null;
+  /** Map of chapter_id → user_topic_state.id, for routing revision tasks
+   *  on the Daily Plan to the spaced-repetition session UX. */
+  revisionTopicStateByChapter: Record<string, string>;
+  /** chapter_id → chapter row (name, subject) for fast lookup. */
+  chapterMetaById: Record<string, { name: string; subject: "physics" | "chemistry" | "maths" }>;
 }
 
 export function TodayClient({
@@ -39,12 +48,36 @@ export function TodayClient({
   showDay2Explainer,
   fallback,
   fallbackReason,
+  revisionTopicStateByChapter,
+  chapterMetaById,
 }: TodayClientProps) {
   // Show check-in modal automatically on first load if no checkin row exists.
   const [checkinOpen, setCheckinOpen] = useState(!checkinExists);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [addOpen, setAddOpen] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
+  const [revisionTarget, setRevisionTarget] = useState<RevisionTarget | null>(null);
+
+  function onStartRevision(task: Task) {
+    // Only route to RevisionSession if we have a topic_state for this chapter.
+    if (!task.chapter_id) {
+      setSelectedTask(task);
+      return;
+    }
+    const topicStateId = revisionTopicStateByChapter[task.chapter_id];
+    if (!topicStateId) {
+      setSelectedTask(task);
+      return;
+    }
+    const meta = chapterMetaById[task.chapter_id];
+    setRevisionTarget({
+      topicStateId,
+      chapter: meta?.name ?? task.chapter ?? "Revision",
+      subject: (meta?.subject as RevisionTarget["subject"]) ?? "revision",
+      topic: task.topic ?? null,
+      linkedTaskId: task.id,
+    });
+  }
 
   // If a revalidation closes the gap (server now has a checkin), close modal.
   useEffect(() => {
@@ -138,7 +171,12 @@ export function TodayClient({
       {tasks.length > 0 && (
         <div className="flex flex-col gap-2.5">
           {tasks.map((t) => (
-            <TaskCard key={t.id} task={t} onOpen={setSelectedTask} />
+            <TaskCard
+              key={t.id}
+              task={t}
+              onOpen={setSelectedTask}
+              onStartRevision={onStartRevision}
+            />
           ))}
         </div>
       )}
@@ -164,6 +202,7 @@ export function TodayClient({
       <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />
       <AddTaskModal open={addOpen} onClose={() => setAddOpen(false)} />
       <RegenerateModal open={regenOpen} onClose={() => setRegenOpen(false)} />
+      <RevisionSession target={revisionTarget} onClose={() => setRevisionTarget(null)} />
     </>
   );
 }

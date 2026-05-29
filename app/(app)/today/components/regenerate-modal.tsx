@@ -4,7 +4,9 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { RefreshCw, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { regeneratePlanAction, regenerateInitial } from "../actions";
+import { regeneratePlanAction, type RegenerateState } from "../actions";
+
+const regenerateInitial: RegenerateState = { error: null };
 
 const REASONS = [
   "Plan feels too heavy",

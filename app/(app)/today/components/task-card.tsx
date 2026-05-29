@@ -30,9 +30,13 @@ const TASK_TYPE_META: Record<
 export function TaskCard({
   task,
   onOpen,
+  onStartRevision,
 }: {
   task: Task;
   onOpen?: (task: Task) => void;
+  /** When set AND task.task_type === 'revision', the primary CTA opens the
+   *  revision session instead of the generic detail modal. */
+  onStartRevision?: (task: Task) => void;
 }) {
   const [pending, startTransition] = useTransition();
   const [optimisticDone, setOptimisticDone] = useState(task.status === "completed");
@@ -40,6 +44,12 @@ export function TaskCard({
   const type = TASK_TYPE_META[task.task_type] ?? TASK_TYPE_META.new_learning;
   const Icon = type.Icon;
   const done = optimisticDone;
+  const isRevision = task.task_type === "revision" && !!onStartRevision;
+
+  function primaryAction() {
+    if (isRevision && onStartRevision) onStartRevision(task);
+    else onOpen?.(task);
+  }
 
   function onToggle() {
     setOptimisticDone((d) => !d);
@@ -60,7 +70,7 @@ export function TaskCard({
         opacity: done ? 0.55 : 1,
         transition: "all 240ms cubic-bezier(.2,.7,.2,1), opacity 320ms",
       }}
-      onClick={() => onOpen?.(task)}
+      onClick={() => primaryAction()}
     >
       <div className="w-1 flex-shrink-0" style={{ background: color }} />
       <div className="flex flex-1 flex-wrap items-center gap-3.5 px-4 py-3">
@@ -148,7 +158,10 @@ export function TaskCard({
                 : "rgba(255, 122, 89, 0.3)",
               transitionDuration: "180ms",
             }}
-            onClick={() => onOpen?.(task)}
+            onClick={(e) => {
+              e.stopPropagation();
+              primaryAction();
+            }}
           >
             <Icon size={13} /> {type.cta}
           </button>
