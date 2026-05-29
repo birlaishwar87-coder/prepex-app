@@ -39,6 +39,12 @@ export interface PlanContext {
     skipped: boolean;
   };
 
+  // PRD §4.3 Bad Day Protocol — true when this is a return after 2+
+  // consecutive inactive days. System prompt routes to the 3-task light
+  // plan when this is set.
+  is_bad_day_return: boolean;
+  days_since_last_active: number;
+
   // Master syllabus available to the planner. Groq MUST pick chapter names
   // from this list — never invent. We provide chapter_id alongside so the
   // server can stitch by ID, not fuzzy match on names.

@@ -36,8 +36,8 @@ The app boots without any env vars filled in — Supabase + Groq clients fail lo
 | 3 | Auth — Google OAuth + email/password (phone OTP deferred) | ✅ Done |
 | 4 | Onboarding flow (7 steps) | ✅ Done |
 | 5 | Groq plan-generation engine | ✅ Done |
-| 6 | Daily Plan home (real UX) | ⏳ Next |
-| 7 | Revision Scheduler | ⏳ |
+| 6 | Daily Plan home (real UX) | ✅ Done |
+| 7 | Revision Scheduler (algorithm + session UI) | ⏳ Next |
 | 8 | Backlog Management | ⏳ |
 | 9 | AI Chat | ⏳ |
 | 10 | Settings + polish | ⏳ |

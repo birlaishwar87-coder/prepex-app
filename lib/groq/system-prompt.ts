@@ -49,10 +49,21 @@ ORDER OF PRECEDENCE (apply the FIRST matching rule)
    → If recovery_mode.type === "backlog": 50 % time on backlog tasks, 30 % revision, 20 % new learning. Streak protection is automatic — don't mention it.
    → If recovery_mode.type === "burnout": cut the daily_hours_target by 40 %, NO new learning, add ONE wellness task (5-min), tone softer.
 
-4. checkin.response === "drained"
-   → Return { "generation_reason": "bad_day_protocol" } shape ONLY if this is a return after inactivity (the context will tell you via is_first_plan = false AND days_since_last_active >= 2). Otherwise apply the drained adjustment inside generation_reason: "standard": cut daily_hours_target by 40 %, drop the hardest topic, include ONE wellness task, no new learning.
+4. is_bad_day_return === true (PRD §4.3 — they came back after ≥2 inactive days)
+   → Return { "generation_reason": "bad_day_protocol" } with EXACTLY 3 tasks.
+   → Each task 15–25 minutes. Total ≤ 75 minutes.
+   → No new_learning task_type — only revision OR practice.
+   → Subject mix: aim for 1 Physics, 1 Maths, 1 Chemistry.
+   → First task should be the most comfortable one (a chapter the student
+     marked studied with last_difficulty: "easy" or "medium" if available).
+   → No wellness task. No backlog. Just a gentle return.
 
-5. STANDARD GENERATION (the common case)
+5. checkin.response === "drained"
+   → Apply the drained adjustment inside generation_reason: "standard":
+     cut daily_hours_target by 40 %, drop the hardest topic, include ONE
+     wellness task, no new learning.
+
+6. STANDARD GENERATION (the common case)
    → generation_reason: "standard" (or "regenerate" if the request specifies regenerate=true).
 
 STANDARD GENERATION RULES

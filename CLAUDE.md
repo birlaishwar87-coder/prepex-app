@@ -74,7 +74,7 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 - [x] **Phase 3** — Auth (Google OAuth + email/password). Phone OTP deferred
 - [x] **Phase 4** — Onboarding flow (7 steps, resume-from-step, chapter seeding)
 - [x] **Phase 5** — Groq plan-generation engine + /api/plan/generate + minimal /today wire-up
-- [ ] **Phase 6** — Daily Plan home (real UX)
+- [x] **Phase 6** — Daily Plan home (real UX with check-in, task cards, regenerate, Bad Day, right panel)
 - [ ] **Phase 7** — Revision Scheduler
 - [ ] **Phase 8** — Backlog Management
 - [ ] **Phase 9** — AI Chat
@@ -304,3 +304,60 @@ app/(app)/today/page.tsx              Reads existing plan/tasks; offers Generate
 - **`anchors[]`** → always `[]`. Custom Day Plan UI ships later.
 - **Bad Day Protocol short-circuit** — currently flows through the system prompt's drained branch when `checkin.response === 'drained'`. Dedicated 2+ inactive-days trigger (PRD §4.3) ships in Phase 6.
 - **Weakness frequency boost** (PRD §14) → not in V1.
+
+## Daily Plan home (Phase 6)
+
+The full `/today` UX. Lives at `app/(app)/today/`.
+
+### File map
+
+```
+app/(app)/today/
+  page.tsx                      Server — reads plan + tasks + checkin + heatmap + tomorrow,
+                                 detects Bad Day Protocol, hands off to client renderer.
+  today-client.tsx              Client — top-level state (modals, selected task) + composition.
+  actions.ts                    Server actions: submitCheckin, toggleTaskCompleted,
+                                 regeneratePlan, addCustomTask, removeTask, acknowledgeBadDay.
+  components/
+    checkin-modal.tsx           PRD §3 — 5 emojis + Skip; submit gens plan when none yet.
+    task-card.tsx               PRD §1.3 — subject color bar, optimistic checkbox, CTA.
+    task-detail-modal.tsx       Mark complete / Move to backlog / Remove.
+    add-task-modal.tsx          PRD §1.4.2 — subject + topic + type + duration + window.
+    regenerate-modal.tsx        PRD §1.3.4 — reason capture, logs daily_plan_regenerations.
+    bad-day-welcome.tsx         PRD §4.3 — no backlog count, silent streak reset, "Start fresh".
+    fallback-banner.tsx         PRD §1.6 — "Couldn't refresh today's plan…".
+    right-panel.tsx             StreakCard (28-day heatmap) + ProgressRing +
+                                 QuickStats + TomorrowPreview. Visible ≥1200 px.
+```
+
+### Locked invariants
+
+- **Check-in is dismissible** (PRD §3.2.1). Shown as a modal that opens on first load when no
+  daily_checkins row exists. Skip stores `skipped=true` row — pattern still feeds Burnout
+  Detection later.
+- **Plan generation kicks off automatically** on first check-in submit when no plan exists.
+  Subsequent same-day check-in changes do NOT auto-regen — disruptive. User clicks Regenerate
+  manually if they want.
+- **Task completion is optimistic** via useTransition. Roll back on action error.
+- **Streak increments on FIRST completed task of the day** (`completed_tasks` 0→1 transition).
+  Unchecking never decrements — surprising UX (PRD §10 intent).
+- **Bad Day Protocol** (PRD §4.3.1) triggers when `last_active_at ≥ 2 days ago` AND not the
+  first plan ever. Server inserts a `bad_day_protocols` row with `welcome_seen=false`, silently
+  resets `streak_count = 0` (PRD §4.3.5, NO popup), shows BadDayWelcome. User taps
+  "Start fresh" → action marks `welcome_seen=true` and generates the gentle 3-task plan.
+- **NO backlog count is shown on Bad Day Welcome** (PRD §4.3.4). Don't ever surface it there.
+- **Bad Day plan shape** (PRD §4.3.3): 3 tasks, 15–25 min each, no `new_learning`, subject mix,
+  first task should be a comfortable chapter. Enforced by the system prompt's
+  `is_bad_day_return` branch.
+- **Streak heatmap**: 28 days back from plan_date. Intensity 0–4 based on `completed_tasks /
+  total_tasks` ratio. No completions → 0.
+- **Right panel is hidden <1200 px** — there's no real estate. Phase 10 can decide whether
+  to compose a mobile-only Activity tab.
+
+### Stubs deliberately deferred
+
+- **Drag-reorder tasks** (PRD §1.4.4) → Phase 10 polish. Manual reorder requires DnD lib.
+- **Drag time-to-adjust** on task duration → Phase 10.
+- **Focus session timer** (PRD §15) → Phase 8/2-of-roadmap.
+- **Mid-day check-in change auto-regen** (PRD §3.6 edge) → disabled; user can hit Regenerate.
+- **Subject icon glyphs** on TaskCard → using subject color bar only. Phase 10 polish.

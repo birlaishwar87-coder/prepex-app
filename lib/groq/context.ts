@@ -201,6 +201,14 @@ export async function gatherPlanContext(args: {
   // with is_anchor=true for this date. Empty for V1 generation.
   const anchors: PlanContext["anchors"] = [];
 
+  // ---- Bad Day Protocol detection (PRD §4.3.1) ----
+  // Inactive = no app open, no task activity, no checkin. We approximate via
+  // last_active_at (kept fresh by triggers on tasks/checkins/revisions).
+  const daysSinceLastActive = profile.last_active_at
+    ? daysBetween(profile.last_active_at.slice(0, 10), today)
+    : 0;
+  const isBadDayReturn = !isFirstPlan && daysSinceLastActive >= 2;
+
   // ---- compose ----
   const daysToExam =
     profile.exam_date != null ? Math.max(0, daysBetween(today, profile.exam_date)) : null;
@@ -226,6 +234,8 @@ export async function gatherPlanContext(args: {
       response: checkinRow?.response ?? null,
       skipped: checkinRow?.skipped ?? false,
     },
+    is_bad_day_return: isBadDayReturn,
+    days_since_last_active: daysSinceLastActive,
     syllabus,
     studied,
     revisions_due,
