@@ -45,6 +45,7 @@ export function TaskCard({
   const Icon = type.Icon;
   const done = optimisticDone;
   const isRevision = task.task_type === "revision" && !!onStartRevision;
+  const timeLabel = formatTaskTime(task.specific_time, task.estimated_minutes);
 
   function primaryAction() {
     if (isRevision && onStartRevision) onStartRevision(task);
@@ -124,9 +125,24 @@ export function TaskCard({
             <span className="pill" style={{ padding: "3px 8px", fontSize: 11 }}>
               {task.estimated_minutes} min
             </span>
-            <span className="pill" style={{ padding: "3px 8px", fontSize: 11 }}>
-              {task.time_window}
-            </span>
+            {timeLabel ? (
+              <span
+                className="pill"
+                style={{
+                  padding: "3px 8px",
+                  fontSize: 11,
+                  background: "rgba(255,122,89,0.10)",
+                  color: "var(--coral-lighter)",
+                  border: "1px solid rgba(255,122,89,0.30)",
+                }}
+              >
+                {timeLabel}
+              </span>
+            ) : (
+              <span className="pill" style={{ padding: "3px 8px", fontSize: 11 }}>
+                {task.time_window}
+              </span>
+            )}
             {task.is_custom && (
               <span
                 className="pill"
@@ -194,4 +210,37 @@ export function TaskCard({
       `}</style>
     </div>
   );
+}
+
+/**
+ * Format a task's clock time for the pill.
+ * Returns "7:00 – 8:00 PM" when specific_time is set.
+ * Returns null to fall back to the time_window pill.
+ */
+function formatTaskTime(
+  specificTime: string | null,
+  durationMinutes: number
+): string | null {
+  if (!specificTime) return null;
+  const [h, m] = specificTime.split(":").map((s) => parseInt(s, 10));
+  if (Number.isNaN(h) || Number.isNaN(m)) return null;
+
+  const start = new Date(2000, 0, 1, h, m);
+  const end = new Date(start.getTime() + durationMinutes * 60_000);
+
+  const fmt = (d: Date) => {
+    const hours = d.getHours();
+    const mins = d.getMinutes();
+    const am = hours < 12 ? "AM" : "PM";
+    const h12 = ((hours + 11) % 12) + 1;
+    const mm = mins.toString().padStart(2, "0");
+    return mins === 0 ? `${h12} ${am}` : `${h12}:${mm} ${am}`;
+  };
+
+  const sameMeridiem =
+    (start.getHours() < 12 && end.getHours() < 12) ||
+    (start.getHours() >= 12 && end.getHours() >= 12);
+  const startFmt = sameMeridiem ? fmt(start).replace(/ (AM|PM)$/, "") : fmt(start);
+
+  return `${startFmt} – ${fmt(end)}`;
 }

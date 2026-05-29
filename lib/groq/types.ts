@@ -2,10 +2,8 @@
 // Types for the AI planner I/O contract
 // ============================================================
 //
-// PlanContext  → what we SEND to Groq (in the user message JSON)
-// GroqPlanOutput → what Groq RETURNS (validated before persistence)
-//
-// Keep these in sync with the system prompt's "OUTPUT FORMAT" section.
+// PlanContext  → what we SEND to the model (in the user message JSON)
+// GroqPlanOutput → what the model RETURNS (validated before persistence)
 
 import type { Database } from "@/lib/supabase/database.types";
 
@@ -23,14 +21,14 @@ export interface PlanContext {
   user: {
     first_name: string | null;
     goal: Goal | null;
-    exam_date: string | null; // ISO date
+    exam_date: string | null;
     days_to_exam: number | null;
-    daily_hours_target: number; // for this plan_date
+    daily_hours_target: number;
     time_windows: TimeWindow[];
     chronotype: Chronotype;
     coaching: { name: string | null; batch: string | null } | null;
   };
-  plan_date: string; // ISO YYYY-MM-DD
+  plan_date: string;
   is_first_plan: boolean;
   is_late_night_signup: boolean;
 
@@ -39,22 +37,15 @@ export interface PlanContext {
     skipped: boolean;
   };
 
-  // PRD §4.3 Bad Day Protocol — true when this is a return after 2+
-  // consecutive inactive days. System prompt routes to the 3-task light
-  // plan when this is set.
   is_bad_day_return: boolean;
   days_since_last_active: number;
 
-  // Master syllabus available to the planner. Groq MUST pick chapter names
-  // from this list — never invent. We provide chapter_id alongside so the
-  // server can stitch by ID, not fuzzy match on names.
   syllabus: Array<{
     chapter_id: string;
     subject: "physics" | "chemistry" | "maths";
     name: string;
   }>;
 
-  // Topics the student has studied (in revision rotation).
   studied: Array<{
     chapter_id: string;
     chapter: string;
@@ -63,7 +54,6 @@ export interface PlanContext {
     days_since_revised: number | null;
   }>;
 
-  // Revisions due today or earlier (sorted by overdue first).
   revisions_due: Array<{
     chapter_id: string;
     chapter: string;
@@ -73,7 +63,6 @@ export interface PlanContext {
     revision_count: number;
   }>;
 
-  // Backlog items, sorted by weight desc (highest priority first).
   backlog: Array<{
     backlog_id: string;
     subject: Subject;
@@ -81,16 +70,14 @@ export interface PlanContext {
     chapter_id: string | null;
     task_type: TaskType | null;
     estimated_minutes: number | null;
-    priority_weight: number; // 0.20 – 1.00
+    priority_weight: number;
     days_overdue: number;
   }>;
 
-  // Order-of-precedence flags (PRD §1.2.1).
   is_no_study_day: boolean;
   is_mock_day: boolean;
   recovery_mode: { active: boolean; type: "backlog" | "burnout" | null; day_of_7: number | null };
 
-  // Anchor (custom) tasks for this date that AI must plan around.
   anchors: Array<{
     subject: Subject;
     chapter: string | null;
@@ -99,10 +86,14 @@ export interface PlanContext {
     estimated_minutes: number;
     time_window: TimeWindow;
   }>;
+
+  /** Optional — when the student requested this regeneration via chat
+   *  with a specific intent ("mock in 5 days", "I'm wiped", etc.). */
+  user_intent?: string | null;
 }
 
 // ============================================================
-// Output from Groq (must validate before persistence)
+// Output from the model
 // ============================================================
 export type GenerationReason =
   | "standard"
@@ -120,6 +111,8 @@ export interface GroqPlanTask {
   task_type: TaskType;
   estimated_minutes: number;
   time_window: TimeWindow;
+  /** HH:MM 24-hour OR null. Wellness tasks may have null. */
+  specific_time: string | null;
 }
 
 export interface GroqPlanOutput {
@@ -149,6 +142,7 @@ const GENERATION_REASON_VALUES: GenerationReason[] = [
   "recovery_week",
   "bad_day_protocol",
 ];
+const HHMM = /^([01]\d|2[0-3]):[0-5]\d$/;
 
 export function validateGroqOutput(raw: unknown): GroqPlanOutput {
   if (!raw || typeof raw !== "object") {
@@ -196,6 +190,16 @@ function validateTask(raw: unknown, idx: number): GroqPlanTask {
     throw new PlanValidationError(`tasks[${idx}].estimated_minutes out of range: ${t.estimated_minutes}`);
   }
 
+  let specificTime: string | null = null;
+  if (typeof t.specific_time === "string" && t.specific_time.length > 0) {
+    if (!HHMM.test(t.specific_time)) {
+      // Tolerate — strip if malformed.
+      specificTime = null;
+    } else {
+      specificTime = t.specific_time;
+    }
+  }
+
   return {
     subject: t.subject as Subject,
     chapter: typeof t.chapter === "string" ? t.chapter : null,
@@ -204,6 +208,7 @@ function validateTask(raw: unknown, idx: number): GroqPlanTask {
     task_type: t.task_type as TaskType,
     estimated_minutes: Math.round(t.estimated_minutes),
     time_window: t.time_window as TimeWindow,
+    specific_time: specificTime,
   };
 }
 
