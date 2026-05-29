@@ -54,17 +54,30 @@ export default async function TodayPage() {
 
     // First detection of THIS bad-day return → create the row and silently
     // reset streak (PRD §4.3.5 — no popup announcing it).
+    //
+    // EXCEPT during Recovery Mode (PRD §11.5.2): streak protection is
+    // auto-applied. Recovery is the safety net — don't punish the choice.
     if (!existingWelcome) {
+      const { data: activeRecovery } = await supabase
+        .from("recovery_modes")
+        .select("id")
+        .eq("user_id", user.id)
+        .eq("active", true)
+        .maybeSingle<{ id: string }>();
+
       const insertRow: TablesInsert<"bad_day_protocols"> = {
         user_id: user.id,
         inactive_days: daysSinceActive,
         welcome_seen: false,
       };
       await supabase.from("bad_day_protocols").insert(insertRow as never);
-      await supabase
-        .from("profiles")
-        .update({ streak_count: 0 } as never)
-        .eq("id", user.id);
+
+      if (!activeRecovery) {
+        await supabase
+          .from("profiles")
+          .update({ streak_count: 0 } as never)
+          .eq("id", user.id);
+      }
     }
 
     return (
