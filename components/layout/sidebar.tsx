@@ -29,6 +29,9 @@ interface SidebarProps {
   userMeta?: string;
   /** When provided, sidebar shows the user chip + Sign out button. */
   signedIn?: boolean;
+  /** Active backlog count. Pass 0 or undefined to hide the badge.
+   *  Hidden in the first 7 days (PRD §11.8) — handled by the caller. */
+  backlogCount?: number;
 }
 
 export function Sidebar({
@@ -36,6 +39,7 @@ export function Sidebar({
   userName = "Sign in",
   userMeta = "Set up your profile",
   signedIn = false,
+  backlogCount,
 }: SidebarProps) {
   const pathname = usePathname();
 
@@ -57,6 +61,11 @@ export function Sidebar({
         {NAV.map((item) => {
           const isActive =
             pathname === item.href || (item.href !== "/" && pathname?.startsWith(item.href));
+          // Backlog gets a live badge when there are pending items.
+          const dynamicBadge =
+            item.id === "backlog" && backlogCount && backlogCount > 0
+              ? String(backlogCount)
+              : item.badge;
           return (
             <Link
               key={item.id}
@@ -88,7 +97,7 @@ export function Sidebar({
               )}
               <item.Icon size={18} stroke={isActive ? "var(--coral)" : "currentColor"} />
               <span className="flex-1">{item.label}</span>
-              {item.badge && (
+              {dynamicBadge && (
                 <span
                   className={cn(
                     "rounded-full px-2 py-0.5 text-[10px] font-bold",
@@ -99,7 +108,7 @@ export function Sidebar({
                     color: isActive ? "#050010" : "var(--coral-lighter)",
                   }}
                 >
-                  {item.badge}
+                  {dynamicBadge}
                 </span>
               )}
             </Link>

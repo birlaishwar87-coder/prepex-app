@@ -9,6 +9,7 @@ interface AppShellProps {
   userName?: string;
   userMeta?: string;
   signedIn?: boolean;
+  backlogCount?: number;
 }
 
 /**
@@ -22,10 +23,17 @@ export function AppShell({
   userName,
   userMeta,
   signedIn,
+  backlogCount,
 }: AppShellProps) {
   return (
     <>
-      <Sidebar streak={streak} userName={userName} userMeta={userMeta} signedIn={signedIn} />
+      <Sidebar
+        streak={streak}
+        userName={userName}
+        userMeta={userMeta}
+        signedIn={signedIn}
+        backlogCount={backlogCount}
+      />
       <MobileBottomNav />
       <main className="prepex-main min-h-screen pl-[240px] pr-10 pt-8 pb-16 flex gap-8">
         <div className="flex-1 max-w-[800px] min-w-0">{children}</div>

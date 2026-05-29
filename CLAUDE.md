@@ -78,7 +78,7 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 - [x] **Phase 7** — Revision Scheduler (interval engine, phase transitions, /revision queue, shared RevisionSession)
 - [x] **Phase 8** — Backlog Management (/backlog with health tiers, recovery mode, manual add, first-7-days hide)
 - [x] **Phase 9** — AI Chat (/chat with Groq llama-3.3, context-aware reply, ephemeral history)
-- [ ] **Phase 10** — Settings + empty/loading/error states + polish
+- [x] **Phase 10** — Settings + /wellness + real backlog badge + clock times on tasks + chat regen-from-intent + Anthropic Claude as optional provider
 - [ ] **Phase 11** — Mixpanel wiring + final QA + deploy prep
 
 ## Layout map

@@ -40,8 +40,8 @@ The app boots without any env vars filled in — Supabase + Groq clients fail lo
 | 7 | Revision Scheduler (algorithm + session UI) | ✅ Done |
 | 8 | Backlog Management (decay, health, Recovery Mode) | ✅ Done |
 | 9 | AI Chat (Groq plan adjustments) | ✅ Done |
-| 10 | Settings + empty/loading/error states + polish | ⏳ Next |
-| 11 | Mixpanel wiring + deploy prep | ⏳ |
+| 10 | Settings + Wellness + polish | ✅ Done |
+| 11 | Mixpanel wiring + deploy prep | ⏳ Next |
 
 ## Routes (Phase 1 skeleton)
 
