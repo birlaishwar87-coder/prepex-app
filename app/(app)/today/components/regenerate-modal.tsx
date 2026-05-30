@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { RefreshCw, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { useTrackOnSuccess } from "@/lib/analytics/use-track-on-success";
 import { regeneratePlanAction, type RegenerateState } from "../actions";
 
 const regenerateInitial: RegenerateState = { error: null };
@@ -19,6 +20,8 @@ const REASONS = [
 export function RegenerateModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [state, formAction] = useFormState(regeneratePlanAction, regenerateInitial);
   const [reason, setReason] = useState<string | null>(null);
+
+  useTrackOnSuccess(state, "plan_regenerated", { from: "today_modal", reason });
 
   return (
     <Modal open={open} onClose={onClose} width={440}>

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useFormState, useFormStatus } from "react-dom";
 import { X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { useTrackOnSuccess } from "@/lib/analytics/use-track-on-success";
 import { submitCheckinAction, type CheckinState } from "../actions";
 
 const initial: CheckinState = { error: null };
@@ -37,6 +38,8 @@ export function CheckinModal({
 }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [state, formAction] = useFormState(submitCheckinAction, initial);
+
+  useTrackOnSuccess(state, "checkin_submitted", { response: selected ?? "skipped" });
 
   // Close on successful submit
   useEffect(() => {

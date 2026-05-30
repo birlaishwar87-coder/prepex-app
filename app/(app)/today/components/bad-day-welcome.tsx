@@ -2,6 +2,8 @@
 
 import { useTransition } from "react";
 import { ArrowRight } from "lucide-react";
+import { track } from "@/lib/analytics/mixpanel";
+import { TrackOnce } from "@/lib/analytics/track-once";
 import { acknowledgeBadDayAction } from "../actions";
 
 /**
@@ -29,12 +31,20 @@ export function BadDayWelcome({
 
   function onStart() {
     startTransition(async () => {
-      await acknowledgeBadDayAction();
+      const result = await acknowledgeBadDayAction();
+      if (!result.error) {
+        track("bad_day_protocol_acknowledged", { days_away: daysAway });
+      }
     });
   }
 
   return (
     <div className="mx-auto max-w-[640px]">
+      <TrackOnce
+        event="bad_day_protocol_triggered"
+        dedupKey={`bad_day:${daysAway}`}
+        props={{ days_away: daysAway }}
+      />
       <div
         className="glass relative overflow-hidden p-10"
         style={{

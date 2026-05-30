@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { ArrowRight, Brain, Check, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
+import { track } from "@/lib/analytics/mixpanel";
 import { submitRevisionAction, skipRevisionAction } from "../actions";
 import type { Difficulty } from "@/lib/revision/intervals";
 
@@ -88,6 +89,11 @@ export function RevisionSession({
         setError(result.error);
         return;
       }
+      track("revision_completed", {
+        rating,
+        subject: target.subject,
+        from_task: !!target.linkedTaskId,
+      });
       onClose();
     });
   }
@@ -104,6 +110,10 @@ export function RevisionSession({
         setError(result.error);
         return;
       }
+      track("revision_skipped", {
+        subject: target.subject,
+        from_task: !!target.linkedTaskId,
+      });
       onClose();
     });
   }

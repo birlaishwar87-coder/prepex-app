@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { CheckCircle2, MoreHorizontal, Play, RefreshCw, Target } from "lucide-react";
 import type { Tables } from "@/lib/supabase/database.types";
+import { track } from "@/lib/analytics/mixpanel";
 import { toggleTaskCompletedAction } from "../actions";
 
 type Task = Tables<"tasks">;
@@ -53,12 +54,22 @@ export function TaskCard({
   }
 
   function onToggle() {
+    const wasCompleted = task.status === "completed";
     setOptimisticDone((d) => !d);
     startTransition(async () => {
       const result = await toggleTaskCompletedAction(task.id);
       if (result.error) {
-        // Roll back the optimistic state on failure.
-        setOptimisticDone(task.status === "completed");
+        setOptimisticDone(wasCompleted);
+        return;
+      }
+      // Only track the pending → completed transition.
+      if (!wasCompleted) {
+        track("task_completed", {
+          subject: task.subject,
+          task_type: task.task_type,
+          is_custom: !!task.is_custom,
+          is_backlog: !!task.is_backlog,
+        });
       }
     });
   }

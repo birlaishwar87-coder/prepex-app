@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { Lightbulb } from "lucide-react";
+import { track } from "@/lib/analytics/mixpanel";
 import { enterBacklogRecoveryAction } from "../actions";
 
 /**
@@ -13,7 +14,10 @@ export function RecoveryModePrompt({ backlogCount }: { backlogCount: number }) {
 
   function enter() {
     startTransition(async () => {
-      await enterBacklogRecoveryAction();
+      const result = await enterBacklogRecoveryAction();
+      if (!result.error) {
+        track("backlog_recovery_entered", { backlog_count: backlogCount });
+      }
     });
   }
 

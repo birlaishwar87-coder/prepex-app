@@ -26,6 +26,7 @@ import {
   saveHoursAction,
   saveProfileAction,
 } from "./actions";
+import { DeleteAccountModal } from "./delete-account-modal";
 
 type Profile = Tables<"profiles">;
 
@@ -614,6 +615,7 @@ function PrivacySection() {
 // Danger zone
 // ============================================================
 function DangerSection() {
+  const [deleteOpen, setDeleteOpen] = useState(false);
   return (
     <Section title="Account" hint="Sign out anywhere or close the account.">
       <div className="flex flex-col gap-3">
@@ -644,14 +646,23 @@ function DangerSection() {
               <AlertTriangle size={13} style={{ color: "#FCA5A5" }} /> Delete account
             </div>
             <div className="mt-0.5 text-[12px] tertiary">
-              Permanently removes all your data after a 30-day grace period.
+              Removes your account and everything attached to it. Immediate.
             </div>
           </div>
-          <button type="button" disabled className="btn btn-ghost btn-sm" style={{ opacity: 0.5 }}>
-            Coming soon
+          <button
+            type="button"
+            onClick={() => setDeleteOpen(true)}
+            className="btn btn-ghost btn-sm"
+            style={{
+              color: "#FCA5A5",
+              borderColor: "rgba(239, 68, 68, 0.30)",
+            }}
+          >
+            <Trash2 size={13} /> Delete…
           </button>
         </div>
       </div>
+      <DeleteAccountModal open={deleteOpen} onClose={() => setDeleteOpen(false)} />
     </Section>
   );
 }

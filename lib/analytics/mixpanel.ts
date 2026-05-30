@@ -8,7 +8,7 @@ export function initMixpanel(): void {
   if (typeof window === "undefined") return;
   if (initialized) return;
   const token = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
-  if (!token) return; // Quietly no-op when missing — never break the app for missing analytics.
+  if (!token) return; // Quiet no-op when missing — never break the app for missing analytics.
 
   mixpanel.init(token, {
     debug: process.env.NODE_ENV === "development",
@@ -43,12 +43,17 @@ export type PrepexEvent =
   | "signup_completed"
   | "login_completed"
   | "onboarding_step_completed"
+  | "onboarding_completed"
   | "first_plan_generated"
   | "task_completed"
   | "plan_regenerated"
   | "checkin_submitted"
   | "revision_completed"
+  | "revision_skipped"
+  | "backlog_item_added_to_plan"
   | "backlog_recovery_entered"
   | "backlog_recovery_exited"
   | "ai_chat_message_sent"
-  | "bad_day_protocol_triggered";
+  | "bad_day_protocol_triggered"
+  | "bad_day_protocol_acknowledged"
+  | "account_deleted";

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from "react";
 import { RefreshCw, Send } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
+import { track } from "@/lib/analytics/mixpanel";
 import { sendChatTurnAction } from "./actions";
 import type { ChatMessage } from "@/lib/groq/chat";
 
@@ -46,6 +47,10 @@ export function ChatClient({ greeting }: { greeting: string }) {
         // Roll back the user message so they can re-send.
         return;
       }
+      track("ai_chat_message_sent", {
+        message_length: trimmed.length,
+        history_length: messages.length,
+      });
       if (result.reply) {
         setMessages((m) => [...m, { role: "assistant", content: result.reply! }]);
       }

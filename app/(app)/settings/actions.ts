@@ -192,3 +192,44 @@ export async function clearCheckinHistoryAction(): Promise<{ error: string | nul
   revalidatePath("/settings");
   return { error: null };
 }
+
+// ============================================================
+// Account deletion (DPDP §B.6)
+// ============================================================
+// Immediate deletion: the admin client calls auth.admin.deleteUser, which
+// cascades through every table (profiles, tasks, plans, revisions,
+// checkins, backlog, recoveries, signals, bad days) via the FK ON DELETE
+// CASCADE we set up in Phase 2.
+//
+// V1 simplification: no 30-day grace period (PRD §B.6 mentions one). Once
+// confirmed, the row is gone immediately. A grace-period flow requires a
+// scheduled job we don't have in V1.
+//
+// The action signs the user out implicitly — once the auth.users row is
+// gone, the next middleware refresh fails and bounces them to /.
+
+import { getSupabaseAdminClient } from "@/lib/supabase/server";
+
+export async function deleteAccountAction(args: {
+  confirm: string;
+}): Promise<{ error: string | null }> {
+  const { supabase, user } = await requireUser();
+
+  if (args.confirm.trim().toLowerCase() !== "delete my account") {
+    return { error: "Please type 'delete my account' to confirm." };
+  }
+
+  const admin = getSupabaseAdminClient();
+  const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+  if (deleteError) return { error: deleteError.message };
+
+  // Best-effort signout in case the session cookie is still valid until
+  // refresh. Failure is non-fatal — the row is already gone.
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+
+  redirect("/");
+}

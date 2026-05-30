@@ -3,14 +3,11 @@ import { AppShell } from "@/components/layout/app-shell";
 import { getCurrentProfile } from "@/lib/supabase/get-user";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { daysBetween } from "@/lib/utils/backlog-priority";
+import { MixpanelProvider } from "@/lib/analytics/mixpanel-provider";
 
-// All routes inside (app) read per-user data via cookies → must be SSR'd,
-// not prerendered at build time. Without this, Next 14 attempts to statically
-// generate /today, /revision, etc. and they fail because Supabase env vars
-// aren't available during prerender.
 export const dynamic = "force-dynamic";
 
-const BACKLOG_VISIBLE_DAY = 7; // PRD §11.8 — first 7 days hidden
+const BACKLOG_VISIBLE_DAY = 7; // PRD §11.8
 
 export default async function AppLayout({ children }: { children: ReactNode }) {
   const profile = await getCurrentProfile();
@@ -20,7 +17,6 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     ? `${prettyGoal(profile.goal)}${profile.current_class ? ` · ${prettyClass(profile.current_class)}` : ""}`
     : "Onboarding pending";
 
-  // Backlog count for the sidebar badge — hidden in the first 7 days.
   let backlogCount: number | undefined = undefined;
   if (profile?.created_at) {
     const todayIso = new Date().toISOString().slice(0, 10);
@@ -36,16 +32,29 @@ export default async function AppLayout({ children }: { children: ReactNode }) {
     }
   }
 
+  // Mixpanel `identify` props — keep minimal and non-PII (no name, no phone).
+  const mixpanelProps = profile
+    ? {
+        goal: profile.goal,
+        current_class: profile.current_class,
+        chronotype: profile.chronotype,
+        streak_count: profile.streak_count,
+        onboarding_completed: !!profile.onboarding_completed_at,
+      }
+    : undefined;
+
   return (
-    <AppShell
-      streak={profile?.streak_count ?? 0}
-      userName={userName}
-      userMeta={userMeta}
-      signedIn={!!profile}
-      backlogCount={backlogCount}
-    >
-      {children}
-    </AppShell>
+    <MixpanelProvider userId={profile?.id ?? null} userProps={mixpanelProps}>
+      <AppShell
+        streak={profile?.streak_count ?? 0}
+        userName={userName}
+        userMeta={userMeta}
+        signedIn={!!profile}
+        backlogCount={backlogCount}
+      >
+        {children}
+      </AppShell>
+    </MixpanelProvider>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { ArrowRight, MoreHorizontal, PauseCircle, PlayCircle, X } from "lucide-react";
+import { track } from "@/lib/analytics/mixpanel";
 import {
   acknowledgeHeldNudgeAction,
   addBacklogToTodayPlanAction,
@@ -37,10 +38,24 @@ export function BacklogRow({ item }: { item: BacklogRowItem }) {
   const [pending, startTransition] = useTransition();
   const color = SUBJECT_DOT[item.subject] ?? "#A5B4FC";
 
-  function run(action: () => Promise<unknown>) {
+  function run(action: () => Promise<unknown>, eventName?: string) {
     return () => {
       startTransition(async () => {
-        await action();
+        const result = await action();
+        // Lightweight typing: actions return { error: null | string }.
+        if (
+          eventName === "backlog_item_added_to_plan" &&
+          result &&
+          typeof result === "object" &&
+          "error" in result &&
+          (result as { error: unknown }).error == null
+        ) {
+          track("backlog_item_added_to_plan", {
+            subject: item.subject,
+            days_overdue: item.daysOverdue,
+            weight: item.priorityWeight,
+          });
+        }
       });
     };
   }
@@ -118,7 +133,10 @@ export function BacklogRow({ item }: { item: BacklogRowItem }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={run(() => addBacklogToTodayPlanAction(item.id))}
+              onClick={run(
+                () => addBacklogToTodayPlanAction(item.id),
+                "backlog_item_added_to_plan"
+              )}
               disabled={pending}
               className="inline-flex h-9 items-center gap-1.5 rounded-[10px] border px-3.5 text-[13px] font-semibold"
               style={{

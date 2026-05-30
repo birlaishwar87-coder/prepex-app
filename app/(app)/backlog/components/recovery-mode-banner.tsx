@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { Shield } from "lucide-react";
+import { track } from "@/lib/analytics/mixpanel";
 import { exitBacklogRecoveryAction } from "../actions";
 
 /**
@@ -13,7 +14,10 @@ export function RecoveryModeBanner({ dayOf7 }: { dayOf7: number }) {
 
   function leave() {
     startTransition(async () => {
-      await exitBacklogRecoveryAction();
+      const result = await exitBacklogRecoveryAction();
+      if (!result.error) {
+        track("backlog_recovery_exited", { day_of_7: dayOf7 });
+      }
     });
   }
 
