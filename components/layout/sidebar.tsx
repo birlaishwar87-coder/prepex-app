@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Flame, Home, Inbox, LogOut, MessageSquare, RefreshCw, Settings } from "lucide-react";
+import { BookOpen, Calendar, Flame, Home, Inbox, LogOut, MessageSquare, RefreshCw, Settings, Target } from "lucide-react";
 import { Logo } from "@/components/ui/logo";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,7 +17,9 @@ interface NavItem {
 const NAV: NavItem[] = [
   { id: "today", label: "Today", href: "/today", Icon: Home },
   { id: "plan", label: "Plan", href: "/today", Icon: Calendar },
+  { id: "practice", label: "Practice", href: "/practice", Icon: Target },
   { id: "revision", label: "Revision", href: "/revision", Icon: RefreshCw },
+  { id: "library", label: "Library", href: "/library", Icon: BookOpen },
   { id: "backlog", label: "Backlog", href: "/backlog", Icon: Inbox },
   { id: "chat", label: "AI Chat", href: "/chat", Icon: MessageSquare },
   { id: "settings", label: "Settings", href: "/settings", Icon: Settings },

@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Calendar, Home, Inbox, MessageSquare, Settings } from "lucide-react";
+import { BookOpen, Home, MessageSquare, Settings, Target } from "lucide-react";
 
+// 5 most-used surfaces on mobile. Plan + Backlog live on the desktop sidebar
+// only (Plan duplicates Today; Backlog reachable via /backlog or sidebar).
 const TABS = [
   { id: "today", label: "Today", href: "/today", Icon: Home },
-  { id: "plan", label: "Plan", href: "/today", Icon: Calendar },
+  { id: "practice", label: "Practice", href: "/practice", Icon: Target },
+  { id: "library", label: "Library", href: "/library", Icon: BookOpen },
   { id: "chat", label: "Chat", href: "/chat", Icon: MessageSquare },
-  { id: "backlog", label: "Backlog", href: "/backlog", Icon: Inbox },
   { id: "settings", label: "Profile", href: "/settings", Icon: Settings },
 ];
 
