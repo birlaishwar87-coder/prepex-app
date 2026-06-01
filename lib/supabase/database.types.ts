@@ -1,8 +1,3 @@
-// ============================================================
-// AUTO-GENERATED — do not edit by hand.
-// Source: Supabase MCP `generate_typescript_types` against project
-// pqjufzuljwiujvzlqdlf. Regenerate after every schema change.
-// ============================================================
 export type Json =
   | string
   | number
@@ -329,6 +324,329 @@ export type Database = {
         }
         Relationships: []
       }
+      focus_sessions: {
+        Row: {
+          actual_duration_sec: number | null
+          background_seconds: number | null
+          chapter: string | null
+          completed_milestone_count: number | null
+          created_at: string | null
+          cross_app_category: string | null
+          difficulty_rating: Database["public"]["Enums"]["difficulty_t"] | null
+          ended_at: string | null
+          id: string
+          linked_task_id: string | null
+          milestones: Json | null
+          planned_duration_sec: number | null
+          session_notes: string | null
+          session_type: Database["public"]["Enums"]["focus_session_type_t"]
+          started_at: string | null
+          subject: Database["public"]["Enums"]["subject_t"] | null
+          task_type: Database["public"]["Enums"]["task_type_t"] | null
+          terminated_reason:
+            | Database["public"]["Enums"]["focus_terminated_t"]
+            | null
+          timer_mode: Database["public"]["Enums"]["focus_timer_mode_t"]
+          topic: string | null
+          total_milestone_count: number | null
+          user_id: string
+        }
+        Insert: {
+          actual_duration_sec?: number | null
+          background_seconds?: number | null
+          chapter?: string | null
+          completed_milestone_count?: number | null
+          created_at?: string | null
+          cross_app_category?: string | null
+          difficulty_rating?: Database["public"]["Enums"]["difficulty_t"] | null
+          ended_at?: string | null
+          id?: string
+          linked_task_id?: string | null
+          milestones?: Json | null
+          planned_duration_sec?: number | null
+          session_notes?: string | null
+          session_type?: Database["public"]["Enums"]["focus_session_type_t"]
+          started_at?: string | null
+          subject?: Database["public"]["Enums"]["subject_t"] | null
+          task_type?: Database["public"]["Enums"]["task_type_t"] | null
+          terminated_reason?:
+            | Database["public"]["Enums"]["focus_terminated_t"]
+            | null
+          timer_mode?: Database["public"]["Enums"]["focus_timer_mode_t"]
+          topic?: string | null
+          total_milestone_count?: number | null
+          user_id: string
+        }
+        Update: {
+          actual_duration_sec?: number | null
+          background_seconds?: number | null
+          chapter?: string | null
+          completed_milestone_count?: number | null
+          created_at?: string | null
+          cross_app_category?: string | null
+          difficulty_rating?: Database["public"]["Enums"]["difficulty_t"] | null
+          ended_at?: string | null
+          id?: string
+          linked_task_id?: string | null
+          milestones?: Json | null
+          planned_duration_sec?: number | null
+          session_notes?: string | null
+          session_type?: Database["public"]["Enums"]["focus_session_type_t"]
+          started_at?: string | null
+          subject?: Database["public"]["Enums"]["subject_t"] | null
+          task_type?: Database["public"]["Enums"]["task_type_t"] | null
+          terminated_reason?:
+            | Database["public"]["Enums"]["focus_terminated_t"]
+            | null
+          timer_mode?: Database["public"]["Enums"]["focus_timer_mode_t"]
+          topic?: string | null
+          total_milestone_count?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "focus_sessions_linked_task_id_fkey"
+            columns: ["linked_task_id"]
+            isOneToOne: false
+            referencedRelation: "tasks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_bookmarks: {
+        Row: {
+          bookmarked_at: string | null
+          content_id: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          bookmarked_at?: string | null
+          content_id: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          bookmarked_at?: string | null
+          content_id?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_bookmarks_content_id_fkey"
+            columns: ["content_id"]
+            isOneToOne: false
+            referencedRelation: "library_content"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      library_content: {
+        Row: {
+          author: string | null
+          chapter: string
+          chapter_id: string | null
+          content_json: Json | null
+          created_at: string | null
+          file_size_bytes: number | null
+          file_url: string | null
+          id: string
+          last_updated: string | null
+          page_count: number | null
+          subject: Database["public"]["Enums"]["subject_t"]
+          thumbnail_url: string | null
+          title: string
+          type: Database["public"]["Enums"]["library_type_t"]
+        }
+        Insert: {
+          author?: string | null
+          chapter: string
+          chapter_id?: string | null
+          content_json?: Json | null
+          created_at?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          last_updated?: string | null
+          page_count?: number | null
+          subject: Database["public"]["Enums"]["subject_t"]
+          thumbnail_url?: string | null
+          title: string
+          type: Database["public"]["Enums"]["library_type_t"]
+        }
+        Update: {
+          author?: string | null
+          chapter?: string
+          chapter_id?: string | null
+          content_json?: Json | null
+          created_at?: string | null
+          file_size_bytes?: number | null
+          file_url?: string | null
+          id?: string
+          last_updated?: string | null
+          page_count?: number | null
+          subject?: Database["public"]["Enums"]["subject_t"]
+          thumbnail_url?: string | null
+          title?: string
+          type?: Database["public"]["Enums"]["library_type_t"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "library_content_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mistake_notebook_entries: {
+        Row: {
+          archived_at: string | null
+          consecutive_easy_count: number | null
+          correct_answer: string | null
+          created_at: string | null
+          cropped_image_url: string | null
+          current_interval_days: number | null
+          difficulty_rating: Database["public"]["Enums"]["difficulty_t"] | null
+          entry_type: Database["public"]["Enums"]["notebook_entry_type_t"]
+          first_wrong_at: string | null
+          id: string
+          last_reviewed_at: string | null
+          mistake_tags: Database["public"]["Enums"]["mistake_tag_t"][] | null
+          next_review_date: string
+          question_id: string | null
+          review_count: number | null
+          source: Database["public"]["Enums"]["notebook_source_t"]
+          student_answer: string | null
+          student_note: string | null
+          sub_topic: string | null
+          topic: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          archived_at?: string | null
+          consecutive_easy_count?: number | null
+          correct_answer?: string | null
+          created_at?: string | null
+          cropped_image_url?: string | null
+          current_interval_days?: number | null
+          difficulty_rating?: Database["public"]["Enums"]["difficulty_t"] | null
+          entry_type?: Database["public"]["Enums"]["notebook_entry_type_t"]
+          first_wrong_at?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          mistake_tags?: Database["public"]["Enums"]["mistake_tag_t"][] | null
+          next_review_date?: string
+          question_id?: string | null
+          review_count?: number | null
+          source?: Database["public"]["Enums"]["notebook_source_t"]
+          student_answer?: string | null
+          student_note?: string | null
+          sub_topic?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          archived_at?: string | null
+          consecutive_easy_count?: number | null
+          correct_answer?: string | null
+          created_at?: string | null
+          cropped_image_url?: string | null
+          current_interval_days?: number | null
+          difficulty_rating?: Database["public"]["Enums"]["difficulty_t"] | null
+          entry_type?: Database["public"]["Enums"]["notebook_entry_type_t"]
+          first_wrong_at?: string | null
+          id?: string
+          last_reviewed_at?: string | null
+          mistake_tags?: Database["public"]["Enums"]["mistake_tag_t"][] | null
+          next_review_date?: string
+          question_id?: string | null
+          review_count?: number | null
+          source?: Database["public"]["Enums"]["notebook_source_t"]
+          student_answer?: string | null
+          student_note?: string | null
+          sub_topic?: string | null
+          topic?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mistake_notebook_entries_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      practice_sessions: {
+        Row: {
+          completed_at: string | null
+          correct_count: number | null
+          created_at: string | null
+          filters: Json | null
+          id: string
+          marked_for_review_count: number | null
+          mode: Database["public"]["Enums"]["practice_mode_t"]
+          planned_duration_sec: number | null
+          question_ids: string[] | null
+          skipped_count: number | null
+          started_at: string | null
+          status:
+            | Database["public"]["Enums"]["practice_session_status_t"]
+            | null
+          time_taken_sec: number | null
+          total_questions: number | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          completed_at?: string | null
+          correct_count?: number | null
+          created_at?: string | null
+          filters?: Json | null
+          id?: string
+          marked_for_review_count?: number | null
+          mode: Database["public"]["Enums"]["practice_mode_t"]
+          planned_duration_sec?: number | null
+          question_ids?: string[] | null
+          skipped_count?: number | null
+          started_at?: string | null
+          status?:
+            | Database["public"]["Enums"]["practice_session_status_t"]
+            | null
+          time_taken_sec?: number | null
+          total_questions?: number | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          completed_at?: string | null
+          correct_count?: number | null
+          created_at?: string | null
+          filters?: Json | null
+          id?: string
+          marked_for_review_count?: number | null
+          mode?: Database["public"]["Enums"]["practice_mode_t"]
+          planned_duration_sec?: number | null
+          question_ids?: string[] | null
+          skipped_count?: number | null
+          started_at?: string | null
+          status?:
+            | Database["public"]["Enums"]["practice_session_status_t"]
+            | null
+          time_taken_sec?: number | null
+          total_questions?: number | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           batch: string | null
@@ -409,6 +727,170 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      question_attempts: {
+        Row: {
+          attempted_at: string | null
+          id: string
+          is_correct: boolean | null
+          marked_for_review: boolean | null
+          mistake_tag: Database["public"]["Enums"]["mistake_tag_t"] | null
+          question_id: string
+          selected_answer: string | null
+          session_id: string
+          tagged_at: string | null
+          time_spent_sec: number | null
+          user_id: string
+        }
+        Insert: {
+          attempted_at?: string | null
+          id?: string
+          is_correct?: boolean | null
+          marked_for_review?: boolean | null
+          mistake_tag?: Database["public"]["Enums"]["mistake_tag_t"] | null
+          question_id: string
+          selected_answer?: string | null
+          session_id: string
+          tagged_at?: string | null
+          time_spent_sec?: number | null
+          user_id: string
+        }
+        Update: {
+          attempted_at?: string | null
+          id?: string
+          is_correct?: boolean | null
+          marked_for_review?: boolean | null
+          mistake_tag?: Database["public"]["Enums"]["mistake_tag_t"] | null
+          question_id?: string
+          selected_answer?: string | null
+          session_id?: string
+          tagged_at?: string | null
+          time_spent_sec?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "question_attempts_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "question_attempts_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "practice_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      questions: {
+        Row: {
+          chapter: string
+          chapter_id: string | null
+          concept_tags: string[] | null
+          correct_answer: string
+          created_at: string | null
+          difficulty: Database["public"]["Enums"]["difficulty_t"]
+          expected_time_seconds: number | null
+          id: string
+          jee_weightage: Database["public"]["Enums"]["jee_weightage_t"] | null
+          option_a: string | null
+          option_b: string | null
+          option_c: string | null
+          option_d: string | null
+          pyq_paper: string | null
+          pyq_shift: string | null
+          pyq_year: number | null
+          question_image_url: string | null
+          question_text: string
+          question_type: Database["public"]["Enums"]["question_type_t"]
+          solution_image_url: string | null
+          solution_text: string | null
+          source: Database["public"]["Enums"]["question_source_t"]
+          sub_topic: string | null
+          subject: Database["public"]["Enums"]["subject_t"]
+          sum_time_taken_seconds: number | null
+          syllabus_tag: Database["public"]["Enums"]["syllabus_tag_t"] | null
+          times_attempted: number | null
+          times_correct: number | null
+          topic: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          chapter: string
+          chapter_id?: string | null
+          concept_tags?: string[] | null
+          correct_answer: string
+          created_at?: string | null
+          difficulty?: Database["public"]["Enums"]["difficulty_t"]
+          expected_time_seconds?: number | null
+          id?: string
+          jee_weightage?: Database["public"]["Enums"]["jee_weightage_t"] | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          pyq_paper?: string | null
+          pyq_shift?: string | null
+          pyq_year?: number | null
+          question_image_url?: string | null
+          question_text: string
+          question_type?: Database["public"]["Enums"]["question_type_t"]
+          solution_image_url?: string | null
+          solution_text?: string | null
+          source?: Database["public"]["Enums"]["question_source_t"]
+          sub_topic?: string | null
+          subject: Database["public"]["Enums"]["subject_t"]
+          sum_time_taken_seconds?: number | null
+          syllabus_tag?: Database["public"]["Enums"]["syllabus_tag_t"] | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          chapter?: string
+          chapter_id?: string | null
+          concept_tags?: string[] | null
+          correct_answer?: string
+          created_at?: string | null
+          difficulty?: Database["public"]["Enums"]["difficulty_t"]
+          expected_time_seconds?: number | null
+          id?: string
+          jee_weightage?: Database["public"]["Enums"]["jee_weightage_t"] | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          pyq_paper?: string | null
+          pyq_shift?: string | null
+          pyq_year?: number | null
+          question_image_url?: string | null
+          question_text?: string
+          question_type?: Database["public"]["Enums"]["question_type_t"]
+          solution_image_url?: string | null
+          solution_text?: string | null
+          source?: Database["public"]["Enums"]["question_source_t"]
+          sub_topic?: string | null
+          subject?: Database["public"]["Enums"]["subject_t"]
+          sum_time_taken_seconds?: number | null
+          syllabus_tag?: Database["public"]["Enums"]["syllabus_tag_t"] | null
+          times_attempted?: number | null
+          times_correct?: number | null
+          topic?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "questions_chapter_id_fkey"
+            columns: ["chapter_id"]
+            isOneToOne: false
+            referencedRelation: "chapters"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       recovery_modes: {
         Row: {
@@ -688,7 +1170,21 @@ export type Database = {
       chronotype_t: "day" | "mixed" | "night"
       class_type: "class_11" | "class_12" | "dropper_1" | "dropper_2" | "other"
       coach_type: "yes" | "self" | "online"
-      difficulty_t: "easy" | "medium" | "hard"
+      difficulty_t: "easy" | "medium" | "hard" | "very_hard"
+      focus_session_type_t: "plan_linked" | "quick_focus" | "cross_app"
+      focus_terminated_t:
+        | "completed"
+        | "manual_end"
+        | "timeout"
+        | "crash"
+        | "exceeded_5min_bg"
+        | "phone_call"
+      focus_timer_mode_t:
+        | "stopwatch"
+        | "pomodoro_25"
+        | "pomodoro_45"
+        | "pomodoro_60"
+        | "custom"
       goal_type:
         | "jee_main"
         | "jee_adv"
@@ -697,6 +1193,15 @@ export type Database = {
         | "jee_cuet"
         | "boards"
         | "other"
+      jee_weightage_t: "high" | "medium" | "low"
+      library_type_t: "notes" | "formulas" | "keypoints" | "concept_map"
+      mistake_tag_t:
+        | "silly_error"
+        | "conceptual_gap"
+        | "time_pressure"
+        | "wild_guess"
+      notebook_entry_type_t: "text_question" | "image_question"
+      notebook_source_t: "practice" | "mock" | "revision"
       plan_reason_t:
         | "standard"
         | "regenerate"
@@ -705,12 +1210,27 @@ export type Database = {
         | "recovery_week"
         | "bad_day_protocol"
       plan_status_t: "active" | "completed" | "abandoned"
+      practice_mode_t:
+        | "chapter"
+        | "pyq"
+        | "mistake_retest"
+        | "mock"
+        | "dpp"
+        | "custom"
+      practice_session_status_t: "active" | "completed" | "abandoned"
+      question_source_t: "curated" | "jee_main_pyq" | "jee_advanced_pyq"
+      question_type_t:
+        | "single_correct"
+        | "multiple_correct"
+        | "integer"
+        | "assertion_reason"
       recovery_end_reason_t:
         | "completed_7_days"
         | "student_ended"
         | "threshold_resolved"
       recovery_type_t: "backlog" | "burnout"
       subject_t: "physics" | "chemistry" | "maths" | "revision" | "wellness"
+      syllabus_tag_t: "jee_main" | "jee_advanced" | "both"
       task_status_t: "pending" | "completed" | "skipped" | "removed"
       task_type_t:
         | "new_learning"
@@ -862,7 +1382,23 @@ export const Constants = {
       chronotype_t: ["day", "mixed", "night"],
       class_type: ["class_11", "class_12", "dropper_1", "dropper_2", "other"],
       coach_type: ["yes", "self", "online"],
-      difficulty_t: ["easy", "medium", "hard"],
+      difficulty_t: ["easy", "medium", "hard", "very_hard"],
+      focus_session_type_t: ["plan_linked", "quick_focus", "cross_app"],
+      focus_terminated_t: [
+        "completed",
+        "manual_end",
+        "timeout",
+        "crash",
+        "exceeded_5min_bg",
+        "phone_call",
+      ],
+      focus_timer_mode_t: [
+        "stopwatch",
+        "pomodoro_25",
+        "pomodoro_45",
+        "pomodoro_60",
+        "custom",
+      ],
       goal_type: [
         "jee_main",
         "jee_adv",
@@ -872,6 +1408,16 @@ export const Constants = {
         "boards",
         "other",
       ],
+      jee_weightage_t: ["high", "medium", "low"],
+      library_type_t: ["notes", "formulas", "keypoints", "concept_map"],
+      mistake_tag_t: [
+        "silly_error",
+        "conceptual_gap",
+        "time_pressure",
+        "wild_guess",
+      ],
+      notebook_entry_type_t: ["text_question", "image_question"],
+      notebook_source_t: ["practice", "mock", "revision"],
       plan_reason_t: [
         "standard",
         "regenerate",
@@ -881,6 +1427,22 @@ export const Constants = {
         "bad_day_protocol",
       ],
       plan_status_t: ["active", "completed", "abandoned"],
+      practice_mode_t: [
+        "chapter",
+        "pyq",
+        "mistake_retest",
+        "mock",
+        "dpp",
+        "custom",
+      ],
+      practice_session_status_t: ["active", "completed", "abandoned"],
+      question_source_t: ["curated", "jee_main_pyq", "jee_advanced_pyq"],
+      question_type_t: [
+        "single_correct",
+        "multiple_correct",
+        "integer",
+        "assertion_reason",
+      ],
       recovery_end_reason_t: [
         "completed_7_days",
         "student_ended",
@@ -888,6 +1450,7 @@ export const Constants = {
       ],
       recovery_type_t: ["backlog", "burnout"],
       subject_t: ["physics", "chemistry", "maths", "revision", "wellness"],
+      syllabus_tag_t: ["jee_main", "jee_advanced", "both"],
       task_status_t: ["pending", "completed", "skipped", "removed"],
       task_type_t: [
         "new_learning",
