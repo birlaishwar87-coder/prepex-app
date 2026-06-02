@@ -56,4 +56,13 @@ export type PrepexEvent =
   | "ai_chat_message_sent"
   | "bad_day_protocol_triggered"
   | "bad_day_protocol_acknowledged"
-  | "account_deleted";
+  | "account_deleted"
+  // Phase 2 (Practice / Focus / Library)
+  | "practice_started"
+  | "practice_completed"
+  | "question_answered"
+  | "mock_completed"
+  | "focus_session_started"
+  | "focus_session_completed"
+  | "library_pdf_opened"
+  | "mistake_retested";
