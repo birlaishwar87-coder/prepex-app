@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { CheckCircle2, MoreHorizontal, Play, RefreshCw, Target } from "lucide-react";
 import type { Tables } from "@/lib/supabase/database.types";
 import { track } from "@/lib/analytics/mixpanel";
@@ -39,6 +40,7 @@ export function TaskCard({
    *  revision session instead of the generic detail modal. */
   onStartRevision?: (task: Task) => void;
 }) {
+  const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [optimisticDone, setOptimisticDone] = useState(task.status === "completed");
   const color = SUBJECT_COLOR[task.subject] ?? "#A5B4FC";
@@ -46,11 +48,29 @@ export function TaskCard({
   const Icon = type.Icon;
   const done = optimisticDone;
   const isRevision = task.task_type === "revision" && !!onStartRevision;
+  const isFocusable =
+    !done &&
+    (task.task_type === "new_learning" ||
+      task.task_type === "dpp" ||
+      task.task_type === "practice" ||
+      task.task_type === "mock_review");
   const timeLabel = formatTaskTime(task.specific_time, task.estimated_minutes);
 
   function primaryAction() {
-    if (isRevision && onStartRevision) onStartRevision(task);
-    else onOpen?.(task);
+    if (isRevision && onStartRevision) {
+      onStartRevision(task);
+      return;
+    }
+    if (isFocusable) {
+      track("focus_session_started", {
+        subject: task.subject,
+        task_type: task.task_type,
+        estimated_minutes: task.estimated_minutes,
+      });
+      router.push(`/focus?taskId=${task.id}`);
+      return;
+    }
+    onOpen?.(task);
   }
 
   function onToggle() {
