@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/supabase/get-user";
 import { SAMPLE_QUESTIONS, isDemoSessionId } from "@/lib/practice/sample-questions";
 import type { QuestionForDisplay } from "../../components/question-display";
 import type { Database } from "@/lib/supabase/database.types";
+import type { PracticeMode } from "../../actions";
 import { SessionClient, type ExistingAttempt } from "./session-client";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,7 @@ export default async function PracticeSessionPage({ params }: { params: { id: st
       <SessionClient
         isDemo
         sessionId="demo"
+        mode="chapter"
         questions={questions}
         existingAttempts={[]}
         contextLookup={Object.fromEntries(
@@ -129,6 +131,7 @@ export default async function PracticeSessionPage({ params }: { params: { id: st
     <SessionClient
       isDemo={false}
       sessionId={session.id}
+      mode={session.mode as PracticeMode}
       questions={questions}
       existingAttempts={attemptsRes.data ?? []}
       contextLookup={contextLookup}

@@ -1,10 +1,13 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
-import { ChevronRight, Loader2, RotateCw } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, ChevronRight, Loader2, RotateCw } from "lucide-react";
 import { RichText } from "../components/rich-text";
 import { retestMistakeAction, type Difficulty } from "../actions";
+import { track } from "@/lib/analytics/mixpanel";
 import { colorForSubject } from "@/lib/practice/question-utils";
+import { chapterSlug } from "@/lib/library/slug";
 import type { MistakeRow } from "./page";
 
 type TabKey = "due" | "upcoming" | "all";
@@ -141,11 +144,16 @@ function ReviewModal({
   function rate(rating: Difficulty) {
     setError(null);
     startTransition(async () => {
-      const { error: e } = await retestMistakeAction({ entryId: entry.id, rating });
+      const { error: e, archived } = await retestMistakeAction({ entryId: entry.id, rating });
       if (e) {
         setError(e);
         return;
       }
+      track("mistake_retested", {
+        rating,
+        archived,
+        review_count: entry.review_count ?? 0,
+      });
       onClose();
     });
   }
@@ -166,6 +174,15 @@ function ReviewModal({
             <div className="t-h4 mt-1 cream-text">
               {entry.question?.chapter ?? entry.topic ?? "Mistake review"}
             </div>
+            {entry.question?.chapter && (
+              <Link
+                href={`/library/${chapterSlug(entry.question.chapter)}`}
+                className="mt-1.5 inline-flex items-center gap-1.5 text-[11.5px] coral-text font-semibold"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <BookOpen size={11} /> Open in Library
+              </Link>
+            )}
           </div>
           <button
             type="button"

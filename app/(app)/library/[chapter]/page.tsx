@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, ChevronRight, FileText, KeyRound, ScrollText, Sparkles } from "lucide-react";
+import { ArrowLeft, ChevronRight, FileText, KeyRound, ScrollText, Sparkles, Target } from "lucide-react";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { getCurrentUser } from "@/lib/supabase/get-user";
 import { findChapterBySlug } from "@/lib/library/slug";
@@ -78,12 +78,20 @@ export default async function ChapterDetail({
         <ArrowLeft size={14} /> Back to Library
       </Link>
 
-      <div className="mb-6">
-        <div className="t-label coral mb-2 capitalize">{chapter.subject}</div>
-        <h1 className="t-h1 mb-1">{chapter.name}</h1>
-        {chapter.chapter_order != null && (
-          <p className="t-body-sm tertiary">Chapter {chapter.chapter_order}</p>
-        )}
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="t-label coral mb-2 capitalize">{chapter.subject}</div>
+          <h1 className="t-h1 mb-1">{chapter.name}</h1>
+          {chapter.chapter_order != null && (
+            <p className="t-body-sm tertiary">Chapter {chapter.chapter_order}</p>
+          )}
+        </div>
+        <Link
+          href={`/practice/chapter?chapterId=${chapter.id}`}
+          className="btn btn-primary btn-sm"
+        >
+          <Target size={14} /> Practice this chapter
+        </Link>
       </div>
 
       {content.length === 0 ? (

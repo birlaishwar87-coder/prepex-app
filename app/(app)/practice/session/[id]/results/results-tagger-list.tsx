@@ -1,10 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, X } from "lucide-react";
+import Link from "next/link";
+import { BookOpen, Check, ChevronDown, ChevronRight, X } from "lucide-react";
 import { RichText } from "../../../components/rich-text";
 import { MistakeTagPicker } from "../../../components/mistake-tag-picker";
 import { colorForSubject } from "@/lib/practice/question-utils";
+import { chapterSlug } from "@/lib/library/slug";
 import type { Database } from "@/lib/supabase/database.types";
 
 type QuestionType = Database["public"]["Enums"]["question_type_t"];
@@ -110,6 +112,17 @@ export function ResultsTaggerList({ attempts }: { attempts: ResultsAttempt[] }) 
                     <div className="text-[13px] secondary leading-relaxed">
                       <RichText text={a.question.solution_text} />
                     </div>
+                  </div>
+                )}
+
+                {a.question.chapter && (
+                  <div className="mt-3 border-t border-[var(--border-default)] pt-3">
+                    <Link
+                      href={`/library/${chapterSlug(a.question.chapter)}`}
+                      className="inline-flex items-center gap-1.5 text-[12px] coral-text font-semibold"
+                    >
+                      <BookOpen size={12} /> Open {a.question.chapter} in Library
+                    </Link>
                   </div>
                 )}
 

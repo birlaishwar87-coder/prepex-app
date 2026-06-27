@@ -56,6 +56,8 @@ export function FilterForm({
   defaultQuestionTypes,
   showTimeLimit = true,
   defaultTimeLimitMinutes = null,
+  preselectedSubject = null,
+  preselectedChapterIds = [],
   title,
   description,
   submitLabel = "Start practice",
@@ -69,6 +71,9 @@ export function FilterForm({
   defaultQuestionTypes?: QuestionType[];
   showTimeLimit?: boolean;
   defaultTimeLimitMinutes?: number | null;
+  /** Deep-link pre-fill — e.g. coming from /library/[chapter] "Practice this chapter". */
+  preselectedSubject?: Subject | null;
+  preselectedChapterIds?: string[];
   title: string;
   description: string;
   submitLabel?: string;
@@ -76,8 +81,8 @@ export function FilterForm({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
-  const [subject, setSubject] = useState<Subject | null>(null);
-  const [chapterIds, setChapterIds] = useState<string[]>([]);
+  const [subject, setSubject] = useState<Subject | null>(preselectedSubject);
+  const [chapterIds, setChapterIds] = useState<string[]>(preselectedChapterIds);
   const [topic, setTopic] = useState("");
   const [difficulties, setDifficulties] = useState<Difficulty[]>(
     defaultDifficulties ?? ["easy", "medium", "hard"]

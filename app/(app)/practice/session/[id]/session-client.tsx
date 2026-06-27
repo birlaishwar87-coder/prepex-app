@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Loader2, X } from "lucide-react";
@@ -10,8 +10,14 @@ import {
   type QuestionForDisplay,
 } from "../../components/question-display";
 import { SampleBanner } from "../../components/sample-banner";
-import { completeSessionAction, submitAnswerAction, type MistakeTag } from "../../actions";
+import {
+  completeSessionAction,
+  submitAnswerAction,
+  type MistakeTag,
+  type PracticeMode,
+} from "../../actions";
 import { checkAnswer } from "@/lib/practice/question-utils";
+import { track } from "@/lib/analytics/mixpanel";
 
 export interface ExistingAttempt {
   id: string;
@@ -32,12 +38,14 @@ interface QuestionState {
 export function SessionClient({
   isDemo,
   sessionId,
+  mode,
   questions,
   existingAttempts,
   contextLookup,
 }: {
   isDemo: boolean;
   sessionId: string;
+  mode: PracticeMode;
   questions: QuestionForDisplay[];
   existingAttempts: ExistingAttempt[];
   contextLookup: Record<string, { chapter: string; topic: string | null; subTopic: string | null }>;
@@ -89,6 +97,15 @@ export function SessionClient({
   useEffect(() => {
     setQuestionStartTime(Date.now());
   }, [index]);
+
+  // Fire practice_started once on mount (real sessions only — demo has no
+  // DB row so it's not a real session to analytics).
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (isDemo || startedRef.current) return;
+    startedRef.current = true;
+    track("practice_started", { mode, questions: questions.length });
+  }, [isDemo, mode, questions.length]);
 
   if (questions.length === 0) {
     return (
@@ -144,6 +161,14 @@ export function SessionClient({
         setServerError(result.error);
         return;
       }
+      track("question_answered", {
+        mode,
+        subject: current.subject,
+        question_type: current.question_type,
+        is_correct: result.isCorrect,
+        time_spent_sec: elapsedSec,
+        skipped: false,
+      });
       updateState(current.id, {
         phase: "feedback",
         feedback: {
@@ -190,6 +215,14 @@ export function SessionClient({
         setServerError(result.error);
         return;
       }
+      track("question_answered", {
+        mode,
+        subject: current.subject,
+        question_type: current.question_type,
+        is_correct: false,
+        time_spent_sec: elapsedSec,
+        skipped: true,
+      });
       updateState(current.id, {
         phase: "feedback",
         feedback: {
@@ -218,6 +251,22 @@ export function SessionClient({
       if (error) {
         setServerError(error);
         return;
+      }
+      const answered = Array.from(states.values()).filter(
+        (s) => s.phase === "feedback" && s.feedback != null
+      );
+      const correct = answered.filter((s) => s.feedback?.isCorrect === true).length;
+      track("practice_completed", {
+        mode,
+        total: questions.length,
+        answered: answered.length,
+        correct,
+      });
+      if (mode === "mock") {
+        track("mock_completed", {
+          total: questions.length,
+          correct,
+        });
       }
       router.push(`/practice/session/${sessionId}/results`);
     });

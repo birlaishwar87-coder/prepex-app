@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowRight, Loader2, Sparkles } from "lucide-react";
 import { rateFocusSessionAction, type Difficulty } from "../../../actions";
+import { track } from "@/lib/analytics/mixpanel";
 
 const RATINGS: Array<{ id: Difficulty; emoji: string; label: string; sub: string; color: string }> = [
   { id: "hard", emoji: "😓", label: "Hard", sub: "Try sooner next time", color: "#F87171" },
@@ -41,6 +42,12 @@ export function RecapScreen({
         setError(err);
         return;
       }
+      track("focus_session_completed", {
+        actual_minutes: actualMinutes,
+        rating,
+        linked_task: !!linkedTaskId,
+        marked_task_complete: !!linkedTaskId && markComplete,
+      });
       router.push("/today");
     });
   }

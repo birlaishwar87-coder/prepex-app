@@ -20,6 +20,10 @@ export type RightPanelData = {
   }>;
   hoursFocusedThisWeek: number;
   completionRatePct: number;
+  /** Focus Mode minutes accumulated today (from `focus_sessions`). */
+  focusMinutesToday: number;
+  /** Number of focus sessions started today. */
+  focusSessionsToday: number;
 };
 
 export function RightPanel({ data }: { data: RightPanelData }) {
@@ -52,6 +56,8 @@ export function RightPanel({ data }: { data: RightPanelData }) {
       <QuickStats
         focusedHours={data.hoursFocusedThisWeek}
         completionRate={data.completionRatePct}
+        focusMinutesToday={data.focusMinutesToday}
+        focusSessionsToday={data.focusSessionsToday}
       />
 
       <TomorrowPreview previews={data.tomorrowPreview} />
@@ -133,13 +139,26 @@ function StreakCard({
 function QuickStats({
   focusedHours,
   completionRate,
+  focusMinutesToday,
+  focusSessionsToday,
 }: {
   focusedHours: number;
   completionRate: number;
+  focusMinutesToday: number;
+  focusSessionsToday: number;
 }) {
+  // Focus-today goes first — it's the most actionable signal during the day.
   const stats = [
-    { v: `${focusedHours}h`, label: "Focused this week", color: "var(--coral)" },
-    { v: `${completionRate}%`, label: "Completion rate", color: "#A78BFA" },
+    {
+      v:
+        focusMinutesToday >= 60
+          ? `${(focusMinutesToday / 60).toFixed(1)}h`
+          : `${focusMinutesToday}m`,
+      label: focusSessionsToday === 1 ? "Focus today · 1 session" : `Focus today · ${focusSessionsToday} sessions`,
+      color: "var(--coral)",
+    },
+    { v: `${focusedHours}h`, label: "Focused this week", color: "#A78BFA" },
+    { v: `${completionRate}%`, label: "Completion rate", color: "#6EE7B7" },
   ];
   return (
     <div className="flex flex-col gap-2">

@@ -209,6 +209,24 @@ export default async function TodayPage() {
   const completionRatePct =
     weekTotal === 0 ? 0 : Math.round((weekDone / weekTotal) * 100);
 
+  // ---- Focus Mode stats for today ----
+  // `started_at >= today 00:00` filter scoped to the user. We sum
+  // actual_duration_sec across all sessions started today (including
+  // terminated-early ones — every minute spent focused counts).
+  const todayStart = `${planDate}T00:00:00Z`;
+  const tomorrowStart = `${addDays(planDate, 1)}T00:00:00Z`;
+  const { data: todayFocusRows } = await supabase
+    .from("focus_sessions")
+    .select("actual_duration_sec")
+    .eq("user_id", user.id)
+    .gte("started_at", todayStart)
+    .lt("started_at", tomorrowStart)
+    .returns<Array<{ actual_duration_sec: number | null }>>();
+  const focusMinutesToday = Math.round(
+    (todayFocusRows ?? []).reduce((acc, r) => acc + (r.actual_duration_sec ?? 0), 0) / 60
+  );
+  const focusSessionsToday = todayFocusRows?.length ?? 0;
+
   // ---- Fallback flag ----
   // Detected from the plan: a Phase-5 fallback served a stale plan whose
   // plan_date != requested plan_date. For now we only flag a fresh
@@ -236,6 +254,8 @@ export default async function TodayPage() {
     tomorrowPreview,
     hoursFocusedThisWeek: Math.round(weekFocusedMinutes / 60),
     completionRatePct,
+    focusMinutesToday,
+    focusSessionsToday,
   };
 
   // Auto-generate plan on first load AFTER late-night signup acknowledged —
