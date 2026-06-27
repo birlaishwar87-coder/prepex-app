@@ -1,42 +1,137 @@
-import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { Pill } from "@/components/ui/pill";
+import { notFound, redirect } from "next/navigation";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/get-user";
+import { SAMPLE_QUESTIONS, isDemoSessionId } from "@/lib/practice/sample-questions";
+import type { QuestionForDisplay } from "../../components/question-display";
+import type { Database } from "@/lib/supabase/database.types";
+import { SessionClient, type ExistingAttempt } from "./session-client";
 
-export const metadata = { title: "Practice session · Prepex" };
+export const dynamic = "force-dynamic";
 
-interface Props {
-  params: { id: string };
-}
+type QuestionRow = {
+  id: string;
+  subject: string;
+  chapter: string;
+  topic: string | null;
+  sub_topic: string | null;
+  question_type: Database["public"]["Enums"]["question_type_t"];
+  question_text: string;
+  options: { A: string; B: string; C: string; D: string } | null;
+  correct_answer: string;
+  solution_text: string | null;
+  expected_time_seconds: number | null;
+};
 
-export default function PracticeSessionPage({ params }: Props) {
+export default async function PracticeSessionPage({ params }: { params: { id: string } }) {
+  // ---- Demo branch: no DB, sample questions, no writes ----
+  if (isDemoSessionId(params.id)) {
+    const questions: QuestionForDisplay[] = SAMPLE_QUESTIONS.map((q) => ({
+      id: q.id,
+      subject: q.subject,
+      chapter: q.chapter,
+      topic: q.topic,
+      question_type: q.question_type,
+      question_text: q.question_text,
+      options: q.options,
+      correct_answer: q.correct_answer,
+      solution_text: q.solution_text,
+    }));
+    return (
+      <SessionClient
+        isDemo
+        sessionId="demo"
+        questions={questions}
+        existingAttempts={[]}
+        contextLookup={Object.fromEntries(
+          SAMPLE_QUESTIONS.map((q) => [q.id, { chapter: q.chapter, topic: q.topic, subTopic: null as string | null }])
+        )}
+      />
+    );
+  }
+
+  // ---- Real session branch ----
+  const user = await getCurrentUser();
+  if (!user) redirect("/login");
+
+  const supabase = getSupabaseServerClient();
+  const { data: session } = await supabase
+    .from("practice_sessions")
+    .select("id, user_id, question_ids, status, mode")
+    .eq("id", params.id)
+    .eq("user_id", user.id)
+    .maybeSingle<{
+      id: string;
+      user_id: string;
+      question_ids: string[] | null;
+      status: string | null;
+      mode: string;
+    }>();
+
+  if (!session) notFound();
+
+  if (session.status === "completed") {
+    redirect(`/practice/session/${params.id}/results`);
+  }
+
+  const questionIds = session.question_ids ?? [];
+  if (questionIds.length === 0) {
+    return (
+      <div className="glass p-6">
+        <h2 className="t-h3 mb-2">This session has no questions.</h2>
+        <p className="t-body-sm secondary">
+          Empty session — try starting a new one from{" "}
+          <a href="/practice" className="coral-text underline">
+            Practice
+          </a>
+          .
+        </p>
+      </div>
+    );
+  }
+
+  const [questionsRes, attemptsRes] = await Promise.all([
+    supabase
+      .from("questions")
+      .select(
+        "id, subject, chapter, topic, sub_topic, question_type, question_text, options, correct_answer, solution_text, expected_time_seconds"
+      )
+      .in("id", questionIds)
+      .returns<QuestionRow[]>(),
+    supabase
+      .from("question_attempts")
+      .select("id, question_id, selected_answer, is_correct, time_spent_sec, marked_for_review, mistake_tag")
+      .eq("session_id", session.id)
+      .eq("user_id", user.id)
+      .returns<ExistingAttempt[]>(),
+  ]);
+
+  const qById = new Map((questionsRes.data ?? []).map((q) => [q.id, q]));
+  const orderedRows = questionIds.map((qid) => qById.get(qid)).filter(Boolean) as QuestionRow[];
+
+  const questions: QuestionForDisplay[] = orderedRows.map((q) => ({
+    id: q.id,
+    subject: q.subject,
+    chapter: q.chapter,
+    topic: q.topic ?? "",
+    question_type: q.question_type,
+    question_text: q.question_text,
+    options: q.options ?? { A: "", B: "", C: "", D: "" },
+    correct_answer: q.correct_answer,
+    solution_text: q.solution_text,
+  }));
+
+  const contextLookup: Record<string, { chapter: string; topic: string | null; subTopic: string | null }> =
+    Object.fromEntries(
+      orderedRows.map((q) => [q.id, { chapter: q.chapter, topic: q.topic, subTopic: q.sub_topic }])
+    );
+
   return (
-    <div>
-      <Link
-        href="/practice"
-        className="mb-4 inline-flex items-center gap-1.5 text-[13px] tertiary"
-      >
-        <ArrowLeft size={14} /> End session
-      </Link>
-      <div className="mb-7 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="t-h1 mb-2">Active session</h1>
-          <p className="t-body-sm tertiary tabular">id: {params.id}</p>
-        </div>
-        <Pill variant="coral">Phase 2.4</Pill>
-      </div>
-
-      <div className="glass" style={{ padding: 28 }}>
-        <h3 className="t-h4 mb-2">What lands here in Phase 2.4</h3>
-        <ul className="t-body-sm secondary space-y-1.5">
-          <li>• PRD §5.4.1 — question-by-question UI with timer + progress bar</li>
-          <li>• Options A/B/C/D with single/multi-select per question_type</li>
-          <li>• Mark for review · Skip · Submit answer</li>
-          <li>• Anti-distraction: no notifications, no nav, confirm-on-exit</li>
-          <li>• KaTeX rendering for math; image questions load progressively</li>
-          <li>• Auto-save to question_attempts on each submit</li>
-          <li>• End → post-practice analysis page (§5.5) with mistake tagging</li>
-        </ul>
-      </div>
-    </div>
+    <SessionClient
+      isDemo={false}
+      sessionId={session.id}
+      questions={questions}
+      existingAttempts={attemptsRes.data ?? []}
+      contextLookup={contextLookup}
+    />
   );
 }

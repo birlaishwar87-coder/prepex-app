@@ -1,11 +1,22 @@
 import Link from "next/link";
-import { ArrowRight, BookMarked, Brain, History, Sparkles, Target } from "lucide-react";
-import { Pill } from "@/components/ui/pill";
+import {
+  ArrowRight,
+  BookMarked,
+  Brain,
+  History,
+  Sparkles,
+  Target,
+  TrendingUp,
+} from "lucide-react";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/get-user";
 
 // PRD §5.3 — Practice Engine has 3 entry points + Mistake Notebook surfaced
-// alongside. Hub lists the 4 paths in. Phase 2.4 builds the full session UX.
+// alongside. Demo session lives at /practice/session/demo for testing before
+// real content seeds in Phase 2.5.
 
 export const metadata = { title: "Practice · Prepex" };
+export const dynamic = "force-dynamic";
 
 const ENTRIES = [
   {
@@ -38,18 +49,71 @@ const ENTRIES = [
   },
 ];
 
-export default function PracticePage() {
+export default async function PracticePage() {
+  const supabase = getSupabaseServerClient();
+  const user = await getCurrentUser();
+
+  // Compute last-7-days stats — completed sessions only.
+  const since = new Date(Date.now() - 7 * 86_400_000).toISOString();
+  const sevenDayCount = user
+    ? (
+        await supabase
+          .from("practice_sessions")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .eq("status", "completed")
+          .gte("started_at", since)
+      ).count ?? 0
+    : 0;
+
+  const dueMistakes = user
+    ? (
+        await supabase
+          .from("mistake_notebook_entries")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", user.id)
+          .is("archived_at", null)
+          .lte("next_review_date", new Date().toISOString().slice(0, 10))
+      ).count ?? 0
+    : 0;
+
   return (
     <div>
-      <div className="mb-7 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="t-h1 mb-2">Practice</h1>
-          <p className="t-body secondary">
-            Curated questions + PYQs. Tagged mistakes that come back at the right time.
-          </p>
-        </div>
-        <Pill variant="purple">Phase 2.2 · skeleton</Pill>
+      <div className="mb-7">
+        <h1 className="t-h1 mb-2">Practice</h1>
+        <p className="t-body secondary">
+          Curated questions + PYQs. Tagged mistakes that come back at the right time.
+        </p>
       </div>
+
+      {(sevenDayCount > 0 || dueMistakes > 0) && (
+        <div
+          className="mb-6 flex flex-wrap items-center gap-4 rounded-input border px-4 py-3"
+          style={{
+            background: "rgba(255,255,255,0.025)",
+            borderColor: "var(--border-default)",
+          }}
+        >
+          <div className="flex items-center gap-2 text-[12.5px]">
+            <TrendingUp size={14} style={{ color: "var(--coral)" }} />
+            <span className="cream-text font-semibold">{sevenDayCount}</span>
+            <span className="secondary">sessions this week</span>
+          </div>
+          {dueMistakes > 0 && (
+            <div className="flex items-center gap-2 text-[12.5px]">
+              <BookMarked size={14} style={{ color: "#FBBF24" }} />
+              <span className="cream-text font-semibold">{dueMistakes}</span>
+              <span className="secondary">mistakes due today</span>
+              <Link
+                href="/practice/mistakes"
+                className="coral-text font-semibold underline"
+              >
+                Open
+              </Link>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         {ENTRIES.map((e) => (
@@ -80,22 +144,18 @@ export default function PracticePage() {
         ))}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 flex flex-wrap gap-3">
         <Link href="/practice/custom" className="btn btn-ghost">
           <Sparkles size={14} /> Custom Practice Builder
         </Link>
-        <p className="mt-2 text-[12px] tertiary">
-          Power-user tool — drill any subject/chapter/topic on demand. Up to 5 sessions/day.
-        </p>
+        <Link href="/practice/session/demo" className="btn btn-text">
+          Try a sample session →
+        </Link>
       </div>
-
-      <div
-        className="mt-10 rounded-input px-3 py-2.5 text-xs tertiary"
-        style={{ background: "rgba(255,255,255,0.025)", border: "1px solid var(--border-default)" }}
-      >
-        <strong className="cream-text">Phase 2.2:</strong> routing skeleton only. Real practice
-        session UX lands in Phase 2.4. Questions seed lands in Phase 2.5.
-      </div>
+      <p className="mt-2 text-[12px] tertiary">
+        Custom builder caps at 5 sessions/day. Sample session is read-only — to see the flow
+        before real content seeds.
+      </p>
     </div>
   );
 }

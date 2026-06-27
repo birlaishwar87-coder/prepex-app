@@ -1,38 +1,37 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
-import { Pill } from "@/components/ui/pill";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { FilterForm, type ChapterOption } from "../components/filter-form";
 
-export const metadata = { title: "PYQ mode · Prepex" };
+export const metadata = { title: "PYQ practice · Prepex" };
 
-export default function PracticePyqPage() {
+export default async function PYQPage() {
+  const supabase = getSupabaseServerClient();
+  const { data: chapters } = await supabase
+    .from("chapters")
+    .select("id, name, subject")
+    .order("subject", { ascending: true })
+    .order("chapter_order", { ascending: true })
+    .returns<ChapterOption[]>();
+
   return (
     <div>
       <Link
         href="/practice"
-        className="mb-4 inline-flex items-center gap-1.5 text-[13px] tertiary"
+        className="mb-3 inline-flex items-center gap-1.5 text-[13px] tertiary"
       >
         <ArrowLeft size={14} /> Back to Practice
       </Link>
-      <div className="mb-7 flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <h1 className="t-h1 mb-2">PYQ mode</h1>
-          <p className="t-body secondary">
-            Last five years of JEE Main + Advanced. Filter by year, paper, subject.
-          </p>
-        </div>
-        <Pill variant="purple">Phase 2.4</Pill>
-      </div>
-
-      <div className="glass" style={{ padding: 28 }}>
-        <h3 className="t-h4 mb-2">What lands here in Phase 2.4</h3>
-        <ul className="t-body-sm secondary space-y-1.5">
-          <li>• Year picker (2021 – 2025)</li>
-          <li>• Paper toggle (Main / Advanced)</li>
-          <li>• Shift filter (Jan / Apr · attempt 1 / 2) for Main</li>
-          <li>• Subject + chapter narrowing</li>
-          <li>• Start → creates a practice_session with mode=&apos;pyq&apos;</li>
-        </ul>
-      </div>
+      <FilterForm
+        mode="pyq"
+        chapters={chapters ?? []}
+        showYears
+        defaultDifficulties={["medium", "hard", "very_hard"]}
+        defaultQuestionTypes={["single_correct", "multiple_correct", "integer"]}
+        defaultTimeLimitMinutes={30}
+        title="Past JEE questions"
+        description="Filterable bank of JEE Main + Advanced PYQs. Pick year + subject; we'll pull a randomized set."
+      />
     </div>
   );
 }

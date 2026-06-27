@@ -1,38 +1,133 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
-import { Pill } from "@/components/ui/pill";
+import { ArrowLeft, BookMarked, Clock, Sparkles } from "lucide-react";
+import { getSupabaseServerClient } from "@/lib/supabase/server";
+import { getCurrentUser } from "@/lib/supabase/get-user";
+import { MistakesClient } from "./mistakes-client";
 
-export const metadata = { title: "Mistake notebook · Prepex" };
+export const metadata = { title: "Mistake Notebook · Prepex" };
 
-export default function PracticeMistakesPage() {
+export default async function MistakesPage() {
+  const supabase = getSupabaseServerClient();
+  const user = await getCurrentUser();
+
+  // Pull active (non-archived) entries with their linked question (if present).
+  const { data: rows } = await supabase
+    .from("mistake_notebook_entries")
+    .select(
+      `id, source, entry_type, topic, sub_topic, student_answer, correct_answer,
+       next_review_date, current_interval_days, review_count, last_reviewed_at,
+       question:question_id (
+         id, subject, chapter, topic, question_text, options, correct_answer,
+         solution_text, question_type
+       )`
+    )
+    .is("archived_at", null)
+    .order("next_review_date", { ascending: true })
+    .returns<MistakeRow[]>();
+
+  if (!user) {
+    return null;
+  }
+
+  const today = new Date().toISOString().slice(0, 10);
+  const entries = (rows ?? []).map((r) => ({
+    ...r,
+    isDue: r.next_review_date != null && r.next_review_date <= today,
+    isOverdue:
+      r.next_review_date != null && r.next_review_date < today,
+  }));
+
+  const dueCount = entries.filter((e) => e.isDue).length;
+  const overdueCount = entries.filter((e) => e.isOverdue).length;
+
   return (
     <div>
       <Link
         href="/practice"
-        className="mb-4 inline-flex items-center gap-1.5 text-[13px] tertiary"
+        className="mb-3 inline-flex items-center gap-1.5 text-[13px] tertiary"
       >
         <ArrowLeft size={14} /> Back to Practice
       </Link>
-      <div className="mb-7 flex flex-wrap items-start justify-between gap-3">
+
+      <div className="mb-6 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="t-h1 mb-2">Mistake notebook</h1>
+          <h1 className="t-h1 mb-2">Mistake Notebook</h1>
           <p className="t-body secondary">
-            Every wrong answer comes back on schedule. Rate it Hard, Medium, or Easy each time.
+            Spaced revisit on every wrong answer. Schedule scales with how often you nail it.
           </p>
         </div>
-        <Pill variant="warning">Phase 2.4</Pill>
+        <div className="flex flex-wrap gap-2">
+          <StatPill
+            color="#FBBF24"
+            Icon={Sparkles}
+            label={`${dueCount} due today`}
+          />
+          {overdueCount > 0 && (
+            <StatPill
+              color="#FCA5A5"
+              Icon={Clock}
+              label={`${overdueCount} overdue`}
+            />
+          )}
+          <StatPill
+            color="#A5B4FC"
+            Icon={BookMarked}
+            label={`${entries.length} active`}
+          />
+        </div>
       </div>
 
-      <div className="glass" style={{ padding: 28 }}>
-        <h3 className="t-h4 mb-2">What lands here in Phase 2.4</h3>
-        <ul className="t-body-sm secondary space-y-1.5">
-          <li>• Due today / overdue / upcoming groups</li>
-          <li>• Filter by subject + mistake tag (silly / conceptual / time / guess)</li>
-          <li>• Tap a row → review session (re-attempt + Hard/Medium/Easy)</li>
-          <li>• 3 consecutive Easy → archived (mastered)</li>
-          <li>• Pattern recognition — marks lost by category this week</li>
-        </ul>
-      </div>
+      <MistakesClient entries={entries} />
     </div>
   );
+}
+
+function StatPill({
+  color,
+  Icon,
+  label,
+}: {
+  color: string;
+  Icon: typeof BookMarked;
+  label: string;
+}) {
+  return (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] font-semibold"
+      style={{
+        background: `${color}1A`,
+        borderColor: `${color}55`,
+        color,
+      }}
+    >
+      <Icon size={12} /> {label}
+    </span>
+  );
+}
+
+export interface MistakeQuestion {
+  id: string;
+  subject: string;
+  chapter: string;
+  topic: string | null;
+  question_text: string;
+  options: { A: string; B: string; C: string; D: string } | null;
+  correct_answer: string;
+  solution_text: string | null;
+  question_type: "single_correct" | "multiple_correct" | "integer" | "assertion_reason";
+}
+
+export interface MistakeRow {
+  id: string;
+  source: string;
+  entry_type: string;
+  topic: string | null;
+  sub_topic: string | null;
+  student_answer: string | null;
+  correct_answer: string | null;
+  next_review_date: string | null;
+  current_interval_days: number | null;
+  review_count: number | null;
+  last_reviewed_at: string | null;
+  question: MistakeQuestion | null;
 }
