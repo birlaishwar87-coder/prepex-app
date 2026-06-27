@@ -44,3 +44,7 @@ next-env.d.ts
 # windows
 Thumbs.db
 desktop.ini
+
+# pdf.worker.min.mjs is regenerated via scripts/sync-pdf-worker.mjs after
+# react-pdf upgrades — keep in repo so first-clone works without an extra step.
+!public/pdf.worker.min.mjs

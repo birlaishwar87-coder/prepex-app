@@ -474,6 +474,87 @@ app/(app)/today/page.tsx  Streak reset on Bad Day SKIPPED when an active
   the next plan-gen if we encode it into the system prompt rule 3a. Phase 10.
 - **Old-items bulk purge at 100+** (PRD §11.9 edge case) — not in V1.
 
+## Library content ingestion (Phase 2.5)
+
+`scripts/seed-library.mjs` is the one-off seeder for the Library — walks
+`../Content Raw/` next to the app, brands every PDF with Prepex header +
+corner mark via `pdf-lib`, uploads to the `library-pdfs` Storage bucket,
+and inserts `library_content` rows. Idempotent: re-running skips uploads
+when the storage object size matches the freshly-branded buffer.
+
+### Usage
+```
+node scripts/seed-library.mjs --plan              # dry-run, show mapping
+node scripts/seed-library.mjs --pilot             # upload 1 PDF
+node scripts/seed-library.mjs --category=formulas # one category
+node scripts/seed-library.mjs --category=notes
+node scripts/seed-library.mjs --category=concept_map
+node scripts/seed-library.mjs --all               # everything (~184 PDFs)
+```
+
+### File map
+```
+scripts/
+  seed-library.mjs        Main seeder (loads .env.local manually,
+                           uses service-role client, concurrency 3).
+  library-mapping.mjs     PDF-filename → DB-chapter alias tables for
+                           Physics / Chemistry / Maths (18 chapters each).
+                           Multiple source PDFs commonly map to one DB
+                           chapter (e.g. "Motion in a Straight Line" +
+                           "Motion in a Plane" + "Projectile Motion" all →
+                           Kinematics).
+  sync-pdf-worker.mjs     Copies node_modules/.../pdf.worker.min.mjs into
+                           public/. Run after react-pdf upgrades.
+```
+
+### Branding (applied to every page of every PDF)
+- Indigo→purple gradient band at top (56px), coral underline accent.
+- "Prepex." coral bold 18pt on the left.
+- "Plan Execute Survive Win" tagline below (cream prefix + coral "Win").
+- Right of header: subject · chapter in cream, content-type in light gray.
+- Bottom-right corner pad: "prepex.io  The execution layer" coral.
+- Bottom-left: page count.
+- Center-of-page low-opacity third-party watermarks (e.g. PW) cannot be
+  removed without rasterising — that would 5–10× file size + break text
+  selection. The strong top band + corner pulls visual attention instead.
+
+### Locked decisions
+- **Chapter mapping is more granular than DB.** DB has 18 chapters per
+  subject; source PDFs split topics finer. Multiple PDFs landing under one
+  chapter is intentional. To re-bucket, edit
+  `scripts/library-mapping.mjs`'s `*_ALIASES` maps.
+- **`chapter` text column is the source-of-truth label.** `chapter_id` FK
+  is set when the alias resolves; if it can't (alias returns `undefined`),
+  the PDF is skipped with a warning. If alias returns `null` (explicit
+  skip — e.g. Mathematical Tools / Basic Maths / Polymers etc., not in
+  JEE 2027 syllabus), the PDF is also skipped.
+- **Notes get branded too.** Earlier draft skipped branding on notes since
+  they're third-party (iitzero / Lakshya JEE); founder call reversed that
+  — every PDF gets the Prepex band on every page. Original author still
+  credited in `library_content.author` for internal tracking.
+- **Bcrypt-style storage path**: `${type}/${subject}/${grade}/${filename}`
+  for grade-bound content, `${type}/${subject}/${filename}` for concept
+  maps. Deterministic so re-runs hit the same object key.
+- **Questions table NOT seeded yet.** `Content Raw/Questions/` is empty.
+  When real question content arrives, the brief locks in: extract →
+  output JSON → wait for Ishwar's verification → seed. Never bulk-insert
+  unverified questions.
+- **PYQs zip not extracted yet** — `Content Raw/PYQ's/` has a 100MB zip
+  that needs unpacking and per-paper organization before seeding.
+
+### Storage layout in `library-pdfs` bucket
+```
+formulas/{subject}/{11th|12th}/JEE_Formula-Sheets_*.pdf
+notes/{subject}/{11th|12th?}/*.pdf
+concept_map/{subject}/{Subject} [Concept Maps].pdf
+```
+
+### Stubs deferred to later phases
+- **Questions seed** → Phase 2.5 deferred bucket (waiting on content).
+- **PYQ extraction + seed** → after Questions seeded.
+- **Library search ranking** (Phase 2.3 used basic ilike) — full-text
+  search with tsvector if scale demands it.
+
 ## AI Chat (Phase 9)
 
 Open chat at `/chat`. Calls Groq `llama-3.3-70b-versatile` with a brand-strict older-sibling system prompt and a JSON context snapshot of the student's current state.

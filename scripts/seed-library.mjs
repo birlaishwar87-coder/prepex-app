@@ -18,6 +18,7 @@ import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { join, basename, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createClient } from "@supabase/supabase-js";
+import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 
 import { normalizeFilename, resolveChapter } from "./library-mapping.mjs";
 
@@ -250,6 +251,213 @@ const SOURCES = [
 ];
 
 // ============================================================
+// PDF branding — Prepex header on every page + corner mark.
+// ============================================================
+// Applied to every PDF (formulas, notes, concept maps). Strategy:
+//
+//  - Solid white rectangle at the top of every page covers third-party
+//    header branding (PW, etc). Coral accent line under it.
+//  - "Prepex" wordmark coral 18pt + "Plan · Execute · Survive · Win"
+//    tagline 8pt below.
+//  - Right side of header shows subject · chapter.
+//  - Bottom-right corner: "prepex.io · The execution layer" on a small
+//    white pad (covers any bottom watermark in that area).
+//  - Bottom-left: page number for navigation.
+//
+// We can't remove the centre low-opacity PW watermarks programmatically
+// without rasterising every page (which would break text selection and
+// blow up file size). The strong Prepex header + corner pulls visual
+// focus instead.
+
+const COLOR_CORAL = rgb(1, 122 / 255, 89 / 255);
+const COLOR_WHITE = rgb(1, 1, 1);
+const COLOR_GRAY = rgb(110 / 255, 110 / 255, 110 / 255);
+const COLOR_CREAM = rgb(250 / 255, 247 / 255, 242 / 255);
+
+// Header gradient endpoints — indigo (left) → purple (right). Pulled from
+// the app's brand visual system (Tailwind violet/indigo deep range).
+const GRADIENT_LEFT = { r: 49 / 255, g: 46 / 255, b: 129 / 255 }; // indigo-900-ish
+const GRADIENT_RIGHT = { r: 88 / 255, g: 28 / 255, b: 135 / 255 }; // purple-900-ish
+
+const TAGLINE_PREFIX = "Plan  Execute  Survive  ";
+const TAGLINE_END = "Win";
+const CORNER = "prepex.io  The execution layer";
+
+function drawHeaderGradient(page, width, height, headerHeight) {
+  // Simulate a left-to-right gradient with thin vertical strips. 200 strips
+  // is enough for visually smooth blending at A4 widths.
+  const STRIPS = 200;
+  const stripW = width / STRIPS + 0.5; // overlap so no hairlines show
+  for (let s = 0; s < STRIPS; s++) {
+    const t = s / (STRIPS - 1);
+    const r = GRADIENT_LEFT.r + (GRADIENT_RIGHT.r - GRADIENT_LEFT.r) * t;
+    const g = GRADIENT_LEFT.g + (GRADIENT_RIGHT.g - GRADIENT_LEFT.g) * t;
+    const b = GRADIENT_LEFT.b + (GRADIENT_RIGHT.b - GRADIENT_LEFT.b) * t;
+    page.drawRectangle({
+      x: s * (width / STRIPS),
+      y: height - headerHeight,
+      width: stripW,
+      height: headerHeight,
+      color: rgb(r, g, b),
+    });
+  }
+}
+
+function typeLabel(t) {
+  return {
+    formulas: "Formula Sheet",
+    notes: "Notes",
+    keypoints: "Key Points",
+    concept_map: "Concept Map",
+  }[t] ?? t;
+}
+
+function safeAscii(s) {
+  // pdf-lib's standard fonts don't ship a full Unicode glyph table. Strip
+  // non-ASCII so things like " " or em-dashes don't throw — replace with
+  // close ASCII equivalents.
+  return s
+    .replace(/[‘’]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/[·•]/g, "-")
+    .replace(/[^\x20-\x7E]/g, "");
+}
+
+async function brandPdf(buf, ctx) {
+  try {
+    const doc = await PDFDocument.load(buf, { ignoreEncryption: true });
+    const helv = await doc.embedFont(StandardFonts.Helvetica);
+    const helvBold = await doc.embedFont(StandardFonts.HelveticaBold);
+
+    const subjectChap = safeAscii(
+      `${ctx.subject.toUpperCase()}  ${ctx.chapter}`
+    );
+    const typeText = typeLabel(ctx.type);
+
+    const pages = doc.getPages();
+    for (let i = 0; i < pages.length; i++) {
+      const page = pages[i];
+      const { width, height } = page.getSize();
+
+      const HEADER_HEIGHT = 56;
+
+      // Indigo → purple gradient cover band — hides existing third-party header.
+      drawHeaderGradient(page, width, height, HEADER_HEIGHT);
+      // Coral accent line right below the header.
+      page.drawRectangle({
+        x: 0,
+        y: height - HEADER_HEIGHT,
+        width,
+        height: 2.5,
+        color: COLOR_CORAL,
+      });
+
+      // "Prepex" wordmark — coral bold 18pt
+      page.drawText("Prepex", {
+        x: 22,
+        y: height - 26,
+        size: 18,
+        font: helvBold,
+        color: COLOR_CORAL,
+      });
+      // Coral dot
+      const prepexW = helvBold.widthOfTextAtSize("Prepex", 18);
+      page.drawText(".", {
+        x: 22 + prepexW,
+        y: height - 26,
+        size: 18,
+        font: helvBold,
+        color: COLOR_CORAL,
+      });
+
+      // Tagline: cream "Plan Execute Survive" + coral "Win"
+      page.drawText(TAGLINE_PREFIX, {
+        x: 22,
+        y: height - 46,
+        size: 8,
+        font: helv,
+        color: COLOR_CREAM,
+      });
+      const taglinePrefixW = helv.widthOfTextAtSize(TAGLINE_PREFIX, 8);
+      page.drawText(TAGLINE_END, {
+        x: 22 + taglinePrefixW,
+        y: height - 46,
+        size: 8,
+        font: helvBold,
+        color: COLOR_CORAL,
+      });
+
+      // Right side of header — subject  chapter (cream on the dark gradient)
+      const subjectChapW = helvBold.widthOfTextAtSize(subjectChap, 8.5);
+      page.drawText(subjectChap, {
+        x: width - subjectChapW - 22,
+        y: height - 24,
+        size: 8.5,
+        font: helvBold,
+        color: COLOR_CREAM,
+      });
+      const typeW = helv.widthOfTextAtSize(typeText, 7.5);
+      page.drawText(typeText, {
+        x: width - typeW - 22,
+        y: height - 42,
+        size: 7.5,
+        font: helv,
+        color: rgb(200 / 255, 200 / 255, 220 / 255),
+      });
+
+      // Bottom-right corner mark. Small white pad covers any
+      // bottom-right watermark; then "prepex.io  The execution layer".
+      const cornerW = helvBold.widthOfTextAtSize(CORNER, 7.5);
+      const PAD_X = 8;
+      const PAD_Y = 4;
+      page.drawRectangle({
+        x: width - cornerW - PAD_X * 2 - 12,
+        y: 6,
+        width: cornerW + PAD_X * 2,
+        height: 7.5 + PAD_Y * 2,
+        color: COLOR_WHITE,
+      });
+      page.drawText(CORNER, {
+        x: width - cornerW - PAD_X - 12,
+        y: 6 + PAD_Y,
+        size: 7.5,
+        font: helvBold,
+        color: COLOR_CORAL,
+      });
+
+      // Bottom-left page count, also on a small white pad.
+      const pageText = `${i + 1} / ${pages.length}`;
+      const pageW = helv.widthOfTextAtSize(pageText, 7.5);
+      page.drawRectangle({
+        x: 8,
+        y: 6,
+        width: pageW + PAD_X * 2,
+        height: 7.5 + PAD_Y * 2,
+        color: COLOR_WHITE,
+      });
+      page.drawText(pageText, {
+        x: 8 + PAD_X,
+        y: 6 + PAD_Y,
+        size: 7.5,
+        font: helv,
+        color: COLOR_GRAY,
+      });
+    }
+
+    return Buffer.from(await doc.save());
+  } catch (err) {
+    console.warn(`  [brand] failed for ${ctx.title}: ${err.message} - uploading original`);
+    return buf;
+  }
+}
+
+// All PDFs get branded — per Ishwar's call (every page, every category).
+function shouldBrand(_type) {
+  return true;
+}
+
+// ============================================================
 // Storage path builder (deterministic so re-runs hit same key)
 // ============================================================
 function storagePath({ type, subject, grade, filename }) {
@@ -316,7 +524,6 @@ function planEntry(source, filename, chapterIdByKey) {
 async function processEntry(entry) {
   if (entry.skipped) return { uploaded: false, inserted: false, skipped: true, entry };
 
-  const stat = statSync(entry.sourcePath);
   const objectPath = storagePath({
     type: entry.type,
     subject: entry.subject,
@@ -324,7 +531,19 @@ async function processEntry(entry) {
     filename: entry.filename,
   });
 
-  // Check if object already exists at same size
+  let buf = readFileSync(entry.sourcePath);
+  if (shouldBrand(entry.type)) {
+    buf = await brandPdf(buf, {
+      subject: entry.subject,
+      chapter: entry.chapter,
+      type: entry.type,
+      title: entry.title,
+    });
+  }
+  const uploadSize = buf.length;
+
+  // Idempotency: if the object exists at the size of our (possibly branded)
+  // buffer, skip the upload. Re-running won't re-process or re-upload.
   let needUpload = true;
   const folder = objectPath.split("/").slice(0, -1).join("/");
   const name = objectPath.split("/").pop();
@@ -332,12 +551,11 @@ async function processEntry(entry) {
     .from(BUCKET)
     .list(folder, { limit: 1000 });
   const existing = listing?.find((o) => o.name === name);
-  if (existing && existing.metadata?.size === stat.size) {
+  if (existing && existing.metadata?.size === uploadSize) {
     needUpload = false;
   }
 
   if (needUpload) {
-    const buf = readFileSync(entry.sourcePath);
     const { error: upErr } = await supabase.storage
       .from(BUCKET)
       .upload(objectPath, buf, {
@@ -349,6 +567,7 @@ async function processEntry(entry) {
 
   const { data: urlData } = supabase.storage.from(BUCKET).getPublicUrl(objectPath);
   const fileUrl = urlData.publicUrl;
+  const stat = { size: uploadSize };
 
   // Check if row already exists by (chapter_id, type, title) OR (subject, chapter, title)
   let exists;
@@ -464,30 +683,51 @@ async function main() {
     console.log(`\nPilot mode → uploading 1 PDF: ${pilot.title}\n`);
   }
 
-  // Execute
+  // Sort so branded categories (small, fast, polished) run first.
+  targets.sort((a, b) => {
+    const wa = shouldBrand(a.type) ? 0 : 1;
+    const wb = shouldBrand(b.type) ? 0 : 1;
+    return wa - wb;
+  });
+
+  // Execute with concurrency 3 — small enough to avoid overwhelming Supabase
+  // storage, big enough to keep things moving.
   let uploaded = 0;
   let inserted = 0;
   let updated = 0;
   let already = 0;
   let failed = 0;
-  for (const entry of targets) {
-    try {
-      const r = await processEntry(entry);
-      if (r.inserted) inserted += 1;
-      else if (r.updated) updated += 1;
-      else already += 1;
-      if (r.uploaded) uploaded += 1;
-      const tag = r.inserted
-        ? "INSERT"
-        : r.updated
-          ? "UPDATE"
-          : "SKIP  ";
-      console.log(`${tag}  ${entry.subject}/${entry.chapter} · ${entry.title}`);
-    } catch (err) {
-      failed += 1;
-      console.error(`FAIL  ${entry.title} — ${err.message}`);
+  let done = 0;
+  const total = targets.length;
+  const queue = [...targets];
+
+  async function worker(workerId) {
+    while (queue.length > 0) {
+      const entry = queue.shift();
+      if (!entry) return;
+      try {
+        const r = await processEntry(entry);
+        if (r.inserted) inserted += 1;
+        else if (r.updated) updated += 1;
+        else already += 1;
+        if (r.uploaded) uploaded += 1;
+        done += 1;
+        const tag = r.inserted ? "INSERT" : r.updated ? "UPDATE" : "SKIP  ";
+        const brand = shouldBrand(entry.type) ? "[branded] " : "          ";
+        console.log(
+          `[${done}/${total}] ${tag} ${brand}${entry.subject}/${entry.chapter} · ${entry.title}`
+        );
+      } catch (err) {
+        failed += 1;
+        done += 1;
+        console.error(`[${done}/${total}] FAIL   ${entry.title} — ${err.message}`);
+      }
     }
   }
+
+  const CONCURRENCY = 3;
+  await Promise.all(Array.from({ length: CONCURRENCY }, (_, i) => worker(i)));
+
   console.log(
     `\nDone. inserted=${inserted} updated=${updated} skipped=${already} uploaded=${uploaded} failed=${failed}`
   );
