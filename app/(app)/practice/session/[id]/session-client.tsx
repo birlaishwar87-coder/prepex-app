@@ -98,6 +98,16 @@ export function SessionClient({
     setQuestionStartTime(Date.now());
   }, [index]);
 
+  // Escape closes the exit confirm modal.
+  useEffect(() => {
+    if (!showExitConfirm) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowExitConfirm(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showExitConfirm]);
+
   // Fire practice_started once on mount (real sessions only — demo has no
   // DB row so it's not a real session to analytics).
   const startedRef = useRef(false);

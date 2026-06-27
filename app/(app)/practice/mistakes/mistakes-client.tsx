@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
 import { BookOpen, ChevronRight, Loader2, RotateCw } from "lucide-react";
 import { RichText } from "../components/rich-text";
@@ -140,6 +140,15 @@ function ReviewModal({
   const [pending, startTransition] = useTransition();
   const [phase, setPhase] = useState<"recall" | "feedback">("recall");
   const [error, setError] = useState<string | null>(null);
+
+  // Escape closes the modal — standard a11y pattern.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
 
   function rate(rating: Difficulty) {
     setError(null);

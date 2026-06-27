@@ -62,6 +62,30 @@ export function SessionClient({ data }: { data: SessionData }) {
     return () => clearInterval(t);
   }, [phase]);
 
+  // Responsive timer size: scale with viewport, cap at 300px. Re-runs on
+  // resize so flipping to portrait/landscape adjusts.
+  const [timerSize, setTimerSize] = useState(300);
+  useEffect(() => {
+    function measure() {
+      const w = typeof window !== "undefined" ? window.innerWidth : 800;
+      const target = Math.min(300, Math.max(220, w - 80));
+      setTimerSize(target);
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  // Escape key closes the exit confirm modal — standard a11y pattern.
+  useEffect(() => {
+    if (!showExitConfirm) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setShowExitConfirm(false);
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showExitConfirm]);
+
   // Auto-complete when pomodoro reaches planned duration.
   useEffect(() => {
     if (phase !== "active") return;
@@ -147,7 +171,7 @@ export function SessionClient({ data }: { data: SessionData }) {
           elapsedSec={elapsed}
           plannedSec={data.plannedSec}
           running
-          size={300}
+          size={timerSize}
           label={TIMER_LABEL[data.timerMode]}
         />
 
