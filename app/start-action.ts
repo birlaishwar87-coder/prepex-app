@@ -35,7 +35,10 @@ export async function startMemberSessionAction(
 
   const memberId = randomUUID();
   const email = `member-${memberId}@prepex.local`;
-  const password = `${randomUUID()}-${randomUUID()}`; // 73-char secure random
+  // bcrypt has a hard 72-byte password ceiling — exceed it and GoTrue panics
+  // with `bcrypt: password length exceeds 72 bytes`. A single UUID is 36 chars
+  // (~128 bits of entropy), well clear of the limit.
+  const password = randomUUID();
 
   try {
     const admin = getSupabaseAdminClient();
