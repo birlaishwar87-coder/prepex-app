@@ -1294,20 +1294,46 @@ function Step7({ data }: { data: FlowData }) {
   useEffect(() => {
     if (ranRef.current) return;
     ranRef.current = true;
-    const t1 = setInterval(() => setIdx((i) => Math.min(i + 1, messages.length - 1)), 1000);
-    const t2 = setInterval(() => setPct((p) => Math.min(100, p + 1.7)), 100);
-    const t3 = setTimeout(async () => {
-      // completeOnboardingAction redirects to /today on success.
-      // On error, we surface and let the user retry by reloading.
-      const res = await completeOnboardingAction();
-      // If we reach this line, the redirect didn't happen — meaning there
-      // was an error. (Server Actions throw on redirect.)
-      if (res?.error) setError(res.error);
-    }, 6500);
+
+    // Fire the action IMMEDIATELY — the redirect to /today is the long pole
+    // (especially in dev mode, where /today has to compile on first hit).
+    // The viz keeps playing alongside instead of adding 6.5s on top.
+    let mounted = true;
+    const t1 = setInterval(
+      () => setIdx((i) => (i + 1) % messages.length),
+      1300
+    );
+    // Progress climbs to ~92% then holds — pegging it at 100% before the
+    // redirect actually fires would be a lie. The remaining 8% snaps on
+    // navigation. Tuned so 0→92% takes ~30s, which covers a typical dev
+    // compile of /today.
+    const t2 = setInterval(
+      () => setPct((p) => (p < 92 ? p + 0.6 : p)),
+      200
+    );
+
+    (async () => {
+      try {
+        const res = await completeOnboardingAction();
+        if (!mounted) return;
+        // Server action throws NEXT_REDIRECT on success — so reaching here
+        // with a result means it errored.
+        if (res?.error) setError(res.error);
+      } catch (err) {
+        // NEXT_REDIRECT is special-cased by React and re-thrown; anything
+        // else here is a true failure (e.g. network drop).
+        const msg = err instanceof Error ? err.message : String(err);
+        if (!mounted) return;
+        if (!msg.includes("NEXT_REDIRECT")) {
+          setError("Couldn't finish setup. Reload the page to retry.");
+        }
+      }
+    })();
+
     return () => {
+      mounted = false;
       clearInterval(t1);
       clearInterval(t2);
-      clearTimeout(t3);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
