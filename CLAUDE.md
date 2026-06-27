@@ -181,56 +181,67 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_lYUjDxhnBHspx1B1sfJSMg_vJJqEk8e
 SUPABASE_SERVICE_ROLE_KEY=  # Dashboard → Settings → API → service_role (secret)
 ```
 
-## Auth (Phase 3)
+## Auth (closed community build — replaces Phase 3)
+
+V1 originally shipped email/password + Google OAuth (Phase 3). For the closed
+community distribution we collapsed all of that to a single "Get started"
+button on the landing page — no signup, no login, no OAuth. Founder decision:
+this build only goes to vetted community members, so friction beats security
+ceremony.
 
 ### Flow
-- `/signup` → Google OAuth or email/password. Email/password collects `first_name` + phone; phone goes onto profile (NOT used as auth method — phone OTP deferred per founder decision).
-- `/login` → Google OAuth or email/password.
-- Server actions in `app/(auth)/login/actions.ts` and `app/(auth)/signup/actions.ts` call `supabase.auth.signInWithPassword` / `signUp`.
-- OAuth callback at `/auth/callback` exchanges code → session, then routes to `/onboarding` (no `onboarding_completed_at`) or `/today`.
-- Signout at `/auth/signout` (POST only) → redirects to `/`.
-- Middleware (`middleware.ts` + `lib/supabase/middleware.ts`) refreshes session every request, redirects unauth → `/login` for protected routes, redirects auth → `/today` from `/login`+`/signup`.
 
-### Files added in Phase 3
+- **Landing `/`** is a server component. If the visitor already has a session
+  cookie, it redirects to `/today` (or `/onboarding` if not done). Otherwise
+  it renders the marketing hero + a single name input + "Get started" button.
+- **`startMemberSessionAction`** (`app/start-action.ts`): admin-creates a
+  random `member-<uuid>@prepex.local` user with a random password and the
+  typed `first_name` in `user_metadata`, email-confirms it, signs the same
+  browser in, redirects to `/onboarding`.
+- **`/auth/signout`** (POST) still exists — sidebar uses it. Redirects to `/`.
+- **Middleware** (`middleware.ts` + `lib/supabase/middleware.ts`) refreshes
+  the session every request and redirects unauthed visitors who hit a
+  protected route back to `/`. There are no "auth routes" to bounce auth
+  users away from anymore — landing handles that server-side.
+
+### Files
+
 ```
-middleware.ts                          Root middleware — calls updateSession
-lib/supabase/middleware.ts             updateSession helper (getAll/setAll cookie pattern)
-lib/supabase/get-user.ts               getCurrentUser, getCurrentProfile — React-cached per request
-
-app/(auth)/layout.tsx                  Shared auth shell (back-home link, footer)
-app/(auth)/signup/page.tsx             Server page
-app/(auth)/signup/signup-form.tsx      Client form ('use client')
-app/(auth)/signup/actions.ts           Server action signupAction
-app/(auth)/login/page.tsx              Server page
-app/(auth)/login/login-form.tsx        Client form
-app/(auth)/login/actions.ts            Server action loginAction
-
-app/auth/callback/route.ts             OAuth code exchange
-app/auth/signout/route.ts              POST signout
-
-components/auth/google-button.tsx      Reusable Google OAuth CTA
-
-app/(app)/layout.tsx                   Now async — pulls profile via getCurrentProfile,
-                                        passes name + streak to AppShell.
-                                        `export const dynamic = 'force-dynamic'`.
-components/layout/sidebar.tsx          Renders Sign-out form when signedIn=true
-components/layout/app-shell.tsx        signedIn prop forwarded to Sidebar
+app/page.tsx              Landing (server) — session check + redirect; renders StartForm
+app/start-form.tsx        Client — single first-name input + Get started button
+app/start-action.ts       Server action — admin.createUser + signInWithPassword
+app/auth/signout/route.ts POST signout
+middleware.ts             Root middleware
+lib/supabase/middleware.ts  updateSession helper — protected-route gate
 ```
 
-### Manual Supabase dashboard config (Ishwar)
+Deleted in the auth rewrite: `app/(auth)/*` (login + signup + layout),
+`app/auth/callback/*` (OAuth), `components/auth/google-button.tsx`.
 
-Before Google OAuth works:
-1. **Authentication → URL Configuration → Site URL** = `http://localhost:3000` (dev) / production URL when deploying
-2. **Authentication → URL Configuration → Redirect URLs** add: `http://localhost:3000/auth/callback`
-3. **Authentication → Providers → Google** → enable; paste OAuth credentials from a Google Cloud OAuth web client. Redirect URI to paste into Google Cloud: `https://pqjufzuljwiujvzlqdlf.supabase.co/auth/v1/callback`
-4. **Email/password** is enabled by default. To skip email-confirmation for local testing: **Authentication → Sign in/up → Email** → turn OFF "Confirm email". Keep ON for production.
+### Invariants
 
-### Auth invariants
+- **`first_name` arrives via `raw_user_meta_data`** — the `handle_new_user`
+  trigger lands it on `profiles.first_name`. Don't INSERT into `profiles`
+  from app code.
+- **Each "Get started" click mints a new user.** No de-duplication. A returning
+  visitor with a valid cookie is bounced to `/today` server-side; one with a
+  cleared cookie creates a fresh identity.
+- **Sessions live in the browser cookie.** Cookie gone → user gone (no
+  email/password recovery exists in this build). That's fine for a closed
+  community distribution; revisit before any public launch.
+- **All server reads go through `getSupabaseServerClient()`** so `auth.uid()`
+  resolves correctly for RLS.
+- **Service-role admin client** is used in exactly one place — the start action
+  — to create the user with `email_confirm: true` so they skip email
+  verification.
 
-- **`first_name` arrives via `raw_user_meta_data`** on signup; the `handle_new_user` trigger picks it up. Don't try to INSERT a profile row from app code.
-- **Phone is stored on profile but NOT used as auth method** in V1 — collected for partner matching / parent connection per PRD §1.0.2.
-- **Auto-confirm via service role** — the signup action calls `admin.auth.admin.updateUserById(id, { email_confirm: true })` then signs the user in immediately. DEV CONVENIENCE — revisit before prod launch if you want real email verification. Set `AUTO_CONFIRM_EMAIL` env or strip the admin call when hardening.
-- **`auth.uid()` everywhere** for RLS. All server-side reads go through `getSupabaseServerClient()` so cookies → session → uid flows correctly.
+### What's NOT in this build (intentionally)
+
+- Public signup / login pages
+- Google OAuth (and the dashboard config that goes with it)
+- Email verification flow
+- Phone OTP
+- Password reset
 
 ## Onboarding (Phase 4)
 

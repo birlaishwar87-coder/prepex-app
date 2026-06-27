@@ -38,8 +38,8 @@ interface SidebarProps {
 
 export function Sidebar({
   streak = 0,
-  userName = "Sign in",
-  userMeta = "Set up your profile",
+  userName = "Member",
+  userMeta = "Welcome",
   signedIn = false,
   backlogCount,
 }: SidebarProps) {

@@ -8,7 +8,7 @@ export const metadata = {
 
 export default async function SettingsPage() {
   const profile = await getCurrentProfile();
-  if (!profile) redirect("/login");
+  if (!profile) redirect("/");
 
   return (
     <div>

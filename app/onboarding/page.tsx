@@ -11,7 +11,7 @@ export default async function OnboardingPage() {
 
   // Middleware guarantees auth — if profile is somehow missing, send back home.
   if (!profile) {
-    redirect("/login");
+    redirect("/");
   }
 
   // Already done? Skip to the app.

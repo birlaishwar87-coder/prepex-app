@@ -4,10 +4,20 @@ import type { Database } from "./database.types";
 
 type CookieToSet = { name: string; value: string; options: CookieOptions };
 
-// Routes that require a signed-in user.
-const PROTECTED_PREFIXES = ["/today", "/revision", "/backlog", "/chat", "/settings", "/onboarding"];
-// Routes that should bounce signed-in users away (already authenticated).
-const AUTH_PREFIXES = ["/login", "/signup"];
+// Routes that require a signed-in user. /(app)/* routes plus onboarding.
+// In the closed community build the only entry point is the landing page,
+// so unauthed visitors get sent back there.
+const PROTECTED_PREFIXES = [
+  "/today",
+  "/revision",
+  "/backlog",
+  "/chat",
+  "/settings",
+  "/onboarding",
+  "/practice",
+  "/library",
+  "/wellness",
+];
 
 /**
  * Refreshes the Supabase session on every request AND handles route protection.
@@ -45,19 +55,11 @@ export async function updateSession(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
   const isProtected = PROTECTED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
-  const isAuthRoute = AUTH_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
 
   if (!user && isProtected) {
+    // Send unauthed visitors back to the landing page (the only entry point).
     const url = request.nextUrl.clone();
-    url.pathname = "/login";
-    // Remember where they wanted to go so we can redirect back after login.
-    url.searchParams.set("redirect", pathname);
-    return NextResponse.redirect(url);
-  }
-
-  if (user && isAuthRoute) {
-    const url = request.nextUrl.clone();
-    url.pathname = "/today";
+    url.pathname = "/";
     return NextResponse.redirect(url);
   }
 

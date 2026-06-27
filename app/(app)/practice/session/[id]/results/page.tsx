@@ -41,7 +41,7 @@ export default async function ResultsPage({ params }: { params: { id: string } }
   }
 
   const user = await getCurrentUser();
-  if (!user) redirect("/login");
+  if (!user) redirect("/");
   const supabase = getSupabaseServerClient();
 
   const { data: session } = await supabase
