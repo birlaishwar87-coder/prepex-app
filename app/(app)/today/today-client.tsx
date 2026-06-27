@@ -87,12 +87,15 @@ export function TodayClient({
   const done = tasks.filter((t) => t.status === "completed").length;
   const totalHours = (tasks.reduce((a, t) => a + (t.estimated_minutes ?? 0), 0) / 60).toFixed(1);
 
-  // Friendly date string (local).
-  const planDateLabel = new Date(planDate + "T12:00:00Z").toLocaleDateString(undefined, {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-  });
+  // Friendly date string. Built manually to avoid SSR/client hydration
+  // mismatch — toLocaleDateString(undefined, ...) infers locale from the
+  // runtime (Node = en-US "Sat, Jun 27", browser = en-IN "Sat, 27 Jun").
+  const planDateLabel = (() => {
+    const d = new Date(planDate + "T12:00:00Z");
+    const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    return `${WEEKDAYS[d.getUTCDay()]}, ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+  })();
 
   return (
     <>

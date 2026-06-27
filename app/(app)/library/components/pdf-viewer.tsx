@@ -14,9 +14,13 @@ import {
 } from "lucide-react";
 import { track } from "@/lib/analytics/mixpanel";
 
-// pdfjs worker — pinned to the SDK's runtime version so we never mismatch.
-// CDN keeps the bundle small; production hardening can self-host this file.
-pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+// pdfjs worker — self-hosted from /public. Originally CDN-loaded via an
+// `import(/*webpackIgnore: true*/...)` trick inside pdfjs, but Turbopack
+// doesn't honor that magic comment and crashes the build. The worker file
+// is copied from node_modules/react-pdf/node_modules/pdfjs-dist/build/
+// pdf.worker.min.mjs into /public/. Bump it whenever react-pdf/pdfjs-dist
+// version changes (see scripts/sync-pdf-worker.mjs).
+pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
 
 export function PdfViewer({
   url,
