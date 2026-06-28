@@ -140,7 +140,7 @@ export async function generateDailyPlan(opts: GenerateOptions): Promise<Generate
       plan: lastPlan,
       tasks: lastTasks ?? [],
       fallback: true,
-      fallbackReason: groqError ?? "AI provider unavailable",
+      fallbackReason: sanitizeProviderError(groqError),
     };
   }
 
@@ -262,6 +262,44 @@ function errorMessage(err: unknown, fallback: string) {
   if (err instanceof Error) return err.message;
   if (typeof err === "string") return err;
   return fallback;
+}
+
+/**
+ * Classifies a raw provider error message into a short, user-facing string.
+ *
+ * Why: provider SDKs (esp. Groq) include the full HTTP response body in
+ * `err.message`. That body is a JSON dump with quotes, braces, internal
+ * org/tier IDs — it leaks into the FallbackBanner and looks awful to a
+ * community member. Pattern-match the common cases instead.
+ *
+ * Never returns more than ~120 chars; never leaks JSON or org identifiers.
+ */
+export function sanitizeProviderError(raw: string | null | undefined): string {
+  if (!raw) return "AI provider unavailable.";
+  const m = raw.toLowerCase();
+
+  // Groq / OpenAI-compatible 429 — rate limit / quota
+  if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("429") || m.includes("quota")) {
+    return "Daily AI quota reached. Tomorrow refreshes automatically, or upgrade the AI tier to lift the cap.";
+  }
+  // 5xx — upstream brown-out
+  if (/\b50\d\b/.test(m) || m.includes("internal server") || m.includes("bad gateway") || m.includes("gateway timeout")) {
+    return "The planning service is temporarily down. We'll retry on the next regenerate.";
+  }
+  // Auth — wrong key
+  if (m.includes("401") || m.includes("403") || m.includes("invalid api key") || m.includes("unauthorized")) {
+    return "AI service key isn't accepted. Check the settings on the server.";
+  }
+  // Network — DNS/connection refused
+  if (m.includes("enotfound") || m.includes("econnrefused") || m.includes("network") || m.includes("fetch failed")) {
+    return "Couldn't reach the planning service. Check your connection and retry.";
+  }
+  // Validation — our JSON validator caught something off
+  if (m.startsWith("validation:") || m.includes("non-json")) {
+    return "AI returned an unexpected shape. Tap Regenerate to try again.";
+  }
+  // Anything else — keep it short and generic
+  return "AI provider had an issue. Tap Regenerate to try again.";
 }
 
 export type { DailyPlanRow, TaskRow, GenerationReason };
