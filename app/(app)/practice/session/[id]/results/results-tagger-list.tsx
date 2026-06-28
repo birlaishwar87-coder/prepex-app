@@ -25,7 +25,6 @@ export interface ResultsAttempt {
     chapter: string;
     topic: string | null;
     question_text: string;
-    options: { A: string; B: string; C: string; D: string } | null;
     correct_answer: string;
     solution_text: string | null;
     question_type: QuestionType;

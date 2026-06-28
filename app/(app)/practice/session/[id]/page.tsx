@@ -17,7 +17,10 @@ type QuestionRow = {
   sub_topic: string | null;
   question_type: Database["public"]["Enums"]["question_type_t"];
   question_text: string;
-  options: { A: string; B: string; C: string; D: string } | null;
+  option_a: string | null;
+  option_b: string | null;
+  option_c: string | null;
+  option_d: string | null;
   correct_answer: string;
   solution_text: string | null;
   expected_time_seconds: number | null;
@@ -95,7 +98,7 @@ export default async function PracticeSessionPage({ params }: { params: { id: st
     supabase
       .from("questions")
       .select(
-        "id, subject, chapter, topic, sub_topic, question_type, question_text, options, correct_answer, solution_text, expected_time_seconds"
+        "id, subject, chapter, topic, sub_topic, question_type, question_text, option_a, option_b, option_c, option_d, correct_answer, solution_text, expected_time_seconds"
       )
       .in("id", questionIds)
       .returns<QuestionRow[]>(),
@@ -117,7 +120,12 @@ export default async function PracticeSessionPage({ params }: { params: { id: st
     topic: q.topic ?? "",
     question_type: q.question_type,
     question_text: q.question_text,
-    options: q.options ?? { A: "", B: "", C: "", D: "" },
+    options: {
+      A: q.option_a ?? "",
+      B: q.option_b ?? "",
+      C: q.option_c ?? "",
+      D: q.option_d ?? "",
+    },
     correct_answer: q.correct_answer,
     solution_text: q.solution_text,
   }));

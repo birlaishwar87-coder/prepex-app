@@ -27,7 +27,6 @@ interface AttemptDetail {
     chapter: string;
     topic: string | null;
     question_text: string;
-    options: { A: string; B: string; C: string; D: string } | null;
     correct_answer: string;
     solution_text: string | null;
     question_type: QuestionType;
@@ -66,7 +65,7 @@ export default async function ResultsPage({ params }: { params: { id: string } }
     .from("question_attempts")
     .select(
       `id, question_id, selected_answer, is_correct, time_spent_sec, marked_for_review, mistake_tag,
-       questions:question_id ( id, subject, chapter, topic, question_text, options, correct_answer, solution_text, question_type )`
+       questions:question_id ( id, subject, chapter, topic, question_text, correct_answer, solution_text, question_type )`
     )
     .eq("session_id", session.id)
     .eq("user_id", user.id)
@@ -189,7 +188,6 @@ export default async function ResultsPage({ params }: { params: { id: string } }
                     chapter: a.questions.chapter,
                     topic: a.questions.topic,
                     question_text: a.questions.question_text,
-                    options: a.questions.options,
                     correct_answer: a.questions.correct_answer,
                     solution_text: a.questions.solution_text,
                     question_type: a.questions.question_type,

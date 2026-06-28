@@ -17,7 +17,7 @@ export default async function MistakesPage() {
       `id, source, entry_type, topic, sub_topic, student_answer, correct_answer,
        next_review_date, current_interval_days, review_count, last_reviewed_at,
        question:question_id (
-         id, subject, chapter, topic, question_text, options, correct_answer,
+         id, subject, chapter, topic, question_text, correct_answer,
          solution_text, question_type
        )`
     )
@@ -111,7 +111,6 @@ export interface MistakeQuestion {
   chapter: string;
   topic: string | null;
   question_text: string;
-  options: { A: string; B: string; C: string; D: string } | null;
   correct_answer: string;
   solution_text: string | null;
   question_type: "single_correct" | "multiple_correct" | "integer" | "assertion_reason";
