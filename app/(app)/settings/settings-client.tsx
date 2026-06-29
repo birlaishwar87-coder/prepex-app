@@ -170,16 +170,24 @@ function GoalSection({ profile }: { profile: Profile }) {
   return (
     <Section title="Goal" hint="Filters syllabus, mocks, and partner matching.">
       <form action={action} className="flex flex-col gap-3">
-        <div className="field relative">
+        {/* Static label — the .field float-label CSS doesn't fire on
+            <select> (no :placeholder-shown), which made the label
+            overlap the value. */}
+        <div className="relative">
+          <label htmlFor="goal" className="t-label tertiary mb-2 block">
+            Your exam target
+          </label>
           <select
             id="goal"
             name="goal"
             defaultValue={profile.goal ?? "jee_adv"}
-            className="h-14 w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 pt-5 pb-1.5 text-[15px] outline-none"
+            className="w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 text-[15px] outline-none cursor-pointer"
             style={{
               borderColor: "var(--border-default)",
               color: "var(--cream)",
               fontFamily: "inherit",
+              height: 48,
+              paddingRight: 32,
             }}
           >
             {Object.entries(GOAL_LABELS).map(([v, l]) => (
@@ -188,7 +196,6 @@ function GoalSection({ profile }: { profile: Profile }) {
               </option>
             ))}
           </select>
-          <label htmlFor="goal">Your exam target</label>
         </div>
         <FieldError error={state.error} />
         <div className="mt-2 flex items-center justify-between gap-3">
@@ -453,13 +460,21 @@ function CoachingSection({ profile }: { profile: Profile }) {
 
         {coachType === "yes" && (
           <div className="grid grid-cols-2 gap-2.5">
-            <div className="field relative">
+            <div>
+              <label htmlFor="coaching_name" className="t-label tertiary mb-2 block">
+                Coaching
+              </label>
               <select
                 id="coaching_name"
                 name="coaching_name"
                 defaultValue={profile.coaching_name ?? ""}
-                className="h-14 w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 pt-5 pb-1.5 text-[14px] outline-none"
-                style={{ borderColor: "var(--border-default)", color: "var(--cream)" }}
+                className="w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 text-[14px] outline-none cursor-pointer"
+                style={{
+                  borderColor: "var(--border-default)",
+                  color: "var(--cream)",
+                  height: 44,
+                  paddingRight: 32,
+                }}
               >
                 <option value="">Select…</option>
                 {COACHINGS.map((c) => (
@@ -468,15 +483,22 @@ function CoachingSection({ profile }: { profile: Profile }) {
                   </option>
                 ))}
               </select>
-              <label htmlFor="coaching_name">Coaching</label>
             </div>
-            <div className="field relative">
+            <div>
+              <label htmlFor="batch" className="t-label tertiary mb-2 block">
+                Batch
+              </label>
               <select
                 id="batch"
                 name="batch"
                 defaultValue={profile.batch ?? ""}
-                className="h-14 w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 pt-5 pb-1.5 text-[14px] outline-none"
-                style={{ borderColor: "var(--border-default)", color: "var(--cream)" }}
+                className="w-full appearance-none rounded-input border bg-[var(--bg-input)] px-3 text-[14px] outline-none cursor-pointer"
+                style={{
+                  borderColor: "var(--border-default)",
+                  color: "var(--cream)",
+                  height: 44,
+                  paddingRight: 32,
+                }}
               >
                 <option value="">Select…</option>
                 {BATCHES.map((b) => (
@@ -485,7 +507,6 @@ function CoachingSection({ profile }: { profile: Profile }) {
                   </option>
                 ))}
               </select>
-              <label htmlFor="batch">Batch</label>
             </div>
           </div>
         )}

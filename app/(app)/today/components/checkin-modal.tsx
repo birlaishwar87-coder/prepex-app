@@ -1,13 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { useTrackOnSuccess } from "@/lib/analytics/use-track-on-success";
-import { submitCheckinAction, type CheckinState } from "../actions";
-
-const initial: CheckinState = { error: null };
+import { track } from "@/lib/analytics/mixpanel";
+import { submitCheckinAction } from "../actions";
 
 const MOODS = [
   { id: "drained", emoji: "😞", label: "Drained" },
@@ -19,6 +16,11 @@ const MOODS = [
 
 /**
  * Daily emotional check-in. PRD §3.
+ *
+ * Rewritten 2026-06-29 to use useTransition (was useFormState). The old
+ * pattern waited for parent revalidation to close the modal, which took
+ * 1-3s — felt broken. Now we close the modal as soon as the action
+ * returns success, then let revalidation refresh the underlying plan.
  *
  * UX rules locked:
  *   • Shown automatically on first load of the day when no checkin row exists.
@@ -37,21 +39,49 @@ export function CheckinModal({
   showDay2Explainer?: boolean;
 }) {
   const [selected, setSelected] = useState<string | null>(null);
-  const [state, formAction] = useFormState(submitCheckinAction, initial);
+  const [pending, startTransition] = useTransition();
+  const [skipPending, startSkipTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  useTrackOnSuccess(state, "checkin_submitted", { response: selected ?? "skipped" });
-
-  // Close on successful submit
+  // Reset state when modal opens fresh.
   useEffect(() => {
-    if (!open) setSelected(null);
+    if (!open) {
+      setSelected(null);
+      setError(null);
+    }
   }, [open]);
 
-  // When the action returns with no error, the page will revalidate and the
-  // parent will close the modal. Nothing to do here.
+  useEffect(() => {
+    return () => {
+      if (closeTimeoutRef.current) clearTimeout(closeTimeoutRef.current);
+    };
+  }, []);
+
+  function submit(skipped: boolean) {
+    setError(null);
+    const responseValue = skipped ? "" : selected ?? "";
+    const transition = skipped ? startSkipTransition : startTransition;
+    transition(async () => {
+      const fd = new FormData();
+      fd.set("response", responseValue);
+      fd.set("skipped", skipped ? "true" : "false");
+      const result = await submitCheckinAction({ error: null }, fd);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      track("checkin_submitted", {
+        response: skipped ? "skipped" : selected ?? "",
+      });
+      // Close immediately — server revalidation continues in the background.
+      onClose();
+    });
+  }
 
   return (
     <Modal open={open} onClose={onClose} width={520}>
-      <div className="p-7">
+      <div className="p-5 sm:p-7">
         <div className="flex items-start justify-between gap-3">
           <div>
             {showDay2Explainer && (
@@ -76,7 +106,7 @@ export function CheckinModal({
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-lg border-none"
+            className="flex h-8 w-8 items-center justify-center rounded-lg border-none flex-shrink-0"
             style={{
               background: "rgba(255,255,255,0.04)",
               color: "var(--text-secondary)",
@@ -86,11 +116,8 @@ export function CheckinModal({
           </button>
         </div>
 
-        <form action={formAction} className="mt-5 flex flex-col gap-4">
-          <input type="hidden" name="response" value={selected ?? ""} />
-          <input type="hidden" name="skipped" value="false" />
-
-          <div className="grid grid-cols-5 gap-2.5">
+        <div className="mt-5 flex flex-col gap-4">
+          <div className="grid grid-cols-5 gap-1.5 sm:gap-2.5">
             {MOODS.map((m, i) => {
               const active = selected === m.id;
               return (
@@ -98,7 +125,8 @@ export function CheckinModal({
                   key={m.id}
                   type="button"
                   onClick={() => setSelected(m.id)}
-                  className="mood-btn flex flex-col items-center justify-center rounded-xl border px-1.5 py-3 transition-all"
+                  disabled={pending || skipPending}
+                  className="mood-btn flex flex-col items-center justify-center rounded-xl border px-1 py-3 transition-all"
                   style={{
                     background: active ? "rgba(255,122,89,0.15)" : "rgba(255,255,255,0.025)",
                     borderColor: active ? "rgba(255,122,89,0.5)" : "var(--border-default)",
@@ -111,13 +139,13 @@ export function CheckinModal({
                   aria-pressed={active}
                 >
                   <span
-                    className="text-[28px] leading-none"
+                    className="text-[26px] sm:text-[28px] leading-none"
                     style={{ transform: active ? "scale(1.1)" : undefined, transition: "transform 220ms" }}
                   >
                     {m.emoji}
                   </span>
                   <span
-                    className="mt-1.5 text-[11px] font-semibold"
+                    className="mt-1.5 text-[10.5px] sm:text-[11px] font-semibold"
                     style={{ color: active ? "var(--coral-lighter)" : "var(--text-secondary)" }}
                   >
                     {m.label}
@@ -127,7 +155,7 @@ export function CheckinModal({
             })}
           </div>
 
-          {state.error && (
+          {error && (
             <div
               className="rounded-input px-3 py-2.5 text-sm"
               style={{
@@ -137,22 +165,36 @@ export function CheckinModal({
               }}
               role="alert"
             >
-              {state.error}
+              {error}
             </div>
           )}
 
           <div className="flex items-center justify-between gap-2">
-            <SkipButton onClose={onClose} />
-            <SubmitButton hasSelection={!!selected} />
+            <button
+              type="button"
+              onClick={() => submit(true)}
+              disabled={pending || skipPending}
+              className="btn btn-text"
+            >
+              {skipPending ? "Saving…" : "Skip today"}
+            </button>
+            <button
+              type="button"
+              onClick={() => submit(false)}
+              disabled={!selected || pending || skipPending}
+              className="btn btn-primary"
+            >
+              {pending ? "Saving…" : "Submit"}
+            </button>
           </div>
 
           <p className="text-center text-[11.5px] tertiary">
             Private. Only used to shape your plan.
           </p>
-        </form>
+        </div>
 
         <style>{`
-          .mood-btn:hover {
+          .mood-btn:not(:disabled):hover {
             background: rgba(255, 122, 89, 0.10) !important;
             border-color: rgba(255, 122, 89, 0.4) !important;
             transform: translateY(-3px);
@@ -161,44 +203,5 @@ export function CheckinModal({
         `}</style>
       </div>
     </Modal>
-  );
-}
-
-function SubmitButton({ hasSelection }: { hasSelection: boolean }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      disabled={!hasSelection || pending}
-      className="btn btn-primary"
-    >
-      {pending ? "Saving…" : "Submit"}
-    </button>
-  );
-}
-
-function SkipButton({ onClose }: { onClose: () => void }) {
-  const { pending } = useFormStatus();
-  return (
-    <button
-      type="submit"
-      name="skipped"
-      value="true"
-      disabled={pending}
-      onClick={(e) => {
-        // The native button has value=true; but the hidden input above has
-        // skipped=false. We need to override on this submission.
-        const form = (e.currentTarget as HTMLButtonElement).form;
-        if (form) {
-          const skippedInput = form.querySelector<HTMLInputElement>('input[name="skipped"]');
-          if (skippedInput) skippedInput.value = "true";
-        }
-        // Don't close — let the form action complete + revalidate + parent close.
-        void onClose;
-      }}
-      className="btn btn-text"
-    >
-      Skip today
-    </button>
   );
 }

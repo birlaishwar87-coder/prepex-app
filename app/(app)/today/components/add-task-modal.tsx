@@ -1,12 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useFormState, useFormStatus } from "react-dom";
+import { useRef, useState, useTransition } from "react";
 import { ChevronDown, Minus, Plus, X } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { addCustomTaskAction, type AddTaskState } from "../actions";
-
-const addTaskInitial: AddTaskState = { error: null };
+import { addCustomTaskAction } from "../actions";
 
 const SUBJECTS = ["physics", "chemistry", "maths", "revision", "wellness"] as const;
 const TASK_TYPES = [
@@ -17,6 +14,13 @@ const TASK_TYPES = [
 ] as const;
 const WINDOWS = ["morning", "midday", "evening", "night", "anytime"] as const;
 
+/**
+ * Switched from useFormState → useTransition (2026-06-29). Reason: the
+ * useFormState shape ({ error: null | string }) made it impossible to
+ * distinguish "initial state" from "successfully added", so the modal
+ * couldn't auto-close. Manual submit fires the action, awaits the
+ * result, and closes the modal on success — feels instant to the user.
+ */
 export function AddTaskModal({
   open,
   onClose,
@@ -26,17 +30,33 @@ export function AddTaskModal({
   onClose: () => void;
   onAdded?: () => void;
 }) {
-  const [state, formAction] = useFormState(addCustomTaskAction, addTaskInitial);
+  const formRef = useRef<HTMLFormElement | null>(null);
   const [subject, setSubject] = useState<string>("physics");
   const [taskType, setTaskType] = useState<string>("new_learning");
   const [duration, setDuration] = useState(60);
   const [window, setWindow] = useState<string>("morning");
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!state.error && onAdded) {
-      // No error → action completed. Caller closes the modal.
-    }
-  }, [state, onAdded]);
+  function handleSubmit(formData: FormData) {
+    setError(null);
+    startTransition(async () => {
+      const result = await addCustomTaskAction({ error: null }, formData);
+      if (result.error) {
+        setError(result.error);
+        return;
+      }
+      // Reset form + close. Parent's revalidatePath('/today') has already
+      // been called server-side; the new task appears on next render.
+      formRef.current?.reset();
+      setSubject("physics");
+      setTaskType("new_learning");
+      setDuration(60);
+      setWindow("morning");
+      onAdded?.();
+      onClose();
+    });
+  }
 
   return (
     <Modal open={open} onClose={onClose} width={540}>
@@ -54,7 +74,7 @@ export function AddTaskModal({
           </button>
         </div>
 
-        <form action={formAction} className="flex flex-col gap-3.5">
+        <form ref={formRef} action={handleSubmit} className="flex flex-col gap-3.5">
           <div className="field">
             <input
               id="task_chapter"
@@ -138,9 +158,6 @@ export function AddTaskModal({
             <div>
               <div className="t-label tertiary mb-2">Time slot</div>
               <input type="hidden" name="time_window" value={window} />
-              {/* 3-col grid wraps 5 buttons into 3+2 rows on mobile; on
-                  desktop the buttons get wider with text-[11px] but still
-                  fit 5 across. */}
               <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                 {WINDOWS.map((w) => (
                   <button
@@ -163,7 +180,7 @@ export function AddTaskModal({
             </div>
           </div>
 
-          {state.error && (
+          {error && (
             <div
               className="rounded-input px-3 py-2.5 text-sm"
               style={{
@@ -173,28 +190,21 @@ export function AddTaskModal({
               }}
               role="alert"
             >
-              {state.error}
+              {error}
             </div>
           )}
 
           <div className="mt-2 flex justify-end gap-2.5">
-            <button type="button" onClick={onClose} className="btn btn-ghost">
+            <button type="button" onClick={onClose} disabled={pending} className="btn btn-ghost">
               Cancel
             </button>
-            <SubmitButton />
+            <button type="submit" disabled={pending} className="btn btn-primary">
+              {pending ? "Adding…" : "Add task"}
+            </button>
           </div>
         </form>
       </div>
     </Modal>
-  );
-}
-
-function SubmitButton() {
-  const { pending } = useFormStatus();
-  return (
-    <button type="submit" disabled={pending} className="btn btn-primary">
-      {pending ? "Adding…" : "Add task"}
-    </button>
   );
 }
 
@@ -213,15 +223,9 @@ function SelectField({
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
-  // Standalone select — NOT using .field float-label CSS because that
-  // pattern relies on :placeholder-shown which selects don't support
-  // (the label was overlapping the value on mobile: "Subject"+"Physics").
   return (
     <div className="relative">
-      <label
-        htmlFor={id}
-        className="t-label tertiary mb-2 block"
-      >
+      <label htmlFor={id} className="t-label tertiary mb-2 block">
         {label}
       </label>
       <select

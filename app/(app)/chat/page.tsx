@@ -23,5 +23,17 @@ export default async function ChatPage() {
       ? `Evening, ${firstName}.`
       : `Hi ${firstName}.`;
 
-  return <ChatClient greeting={greeting} />;
+  // BYOK: tell the client which provider their key resolves to, so the
+  // pill label is honest ("AI Chat · Gemini" not "llama-3.3" if they
+  // chose Gemini). Priority order matches resolveProvider().
+  const provider: "gemini" | "anthropic" | "groq" | "none" = profile?.gemini_api_key
+    ? "gemini"
+    : profile?.anthropic_api_key
+      ? "anthropic"
+      : profile?.groq_api_key
+        ? "groq"
+        : "none";
+  const hasAiKey = provider !== "none";
+
+  return <ChatClient greeting={greeting} provider={provider} hasAiKey={hasAiKey} />;
 }

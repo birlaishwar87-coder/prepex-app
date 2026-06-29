@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef, useState, useTransition } from "react";
-import { RefreshCw, Send } from "lucide-react";
+import { RefreshCw, Send, Sparkles } from "lucide-react";
 import { Pill } from "@/components/ui/pill";
 import { track } from "@/lib/analytics/mixpanel";
 import { sendChatTurnAction } from "./actions";
@@ -14,11 +15,27 @@ const SUGGESTED_PROMPTS = [
   "How am I doing this week?",
 ];
 
-export function ChatClient({ greeting }: { greeting: string }) {
+const PROVIDER_LABEL: Record<"gemini" | "anthropic" | "groq" | "none", string> = {
+  gemini: "Gemini 2.5 Flash",
+  anthropic: "Claude Haiku 4.5",
+  groq: "Llama 3.3 70B",
+  none: "No key set",
+};
+
+export function ChatClient({
+  greeting,
+  provider,
+  hasAiKey,
+}: {
+  greeting: string;
+  provider: "gemini" | "anthropic" | "groq" | "none";
+  hasAiKey: boolean;
+}) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [needsKey, setNeedsKey] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll on new messages.
@@ -33,23 +50,32 @@ export function ChatClient({ greeting }: { greeting: string }) {
     if (!trimmed || pending) return;
 
     setError(null);
+    setNeedsKey(false);
     setInput("");
     const userMsg: ChatMessage = { role: "user", content: trimmed };
+    // Use the up-to-date history at action call time.
+    const historyForAction = messages;
     setMessages((m) => [...m, userMsg]);
 
     startTransition(async () => {
       const result = await sendChatTurnAction({
-        history: messages,
+        history: historyForAction,
         userMessage: trimmed,
       });
       if (result.error) {
         setError(result.error);
-        // Roll back the user message so they can re-send.
+        if (result.needsAiKey) setNeedsKey(true);
+        // ACTUALLY roll back the user message so the suggested prompts
+        // re-appear (they're hidden when messages.length > 0). Without
+        // this, a quota error leaves a stuck user bubble + no path back
+        // to the empty-state prompts.
+        setMessages((m) => m.filter((msg) => msg !== userMsg));
+        setInput(trimmed); // restore in composer so user can retry
         return;
       }
       track("ai_chat_message_sent", {
         message_length: trimmed.length,
-        history_length: messages.length,
+        history_length: historyForAction.length,
       });
       if (result.reply) {
         setMessages((m) => [...m, { role: "assistant", content: result.reply! }]);
@@ -74,7 +100,9 @@ export function ChatClient({ greeting }: { greeting: string }) {
             here for the execution side.
           </p>
         </div>
-        <Pill variant="purple">AI Chat · llama-3.3</Pill>
+        <Pill variant="purple">
+          {hasAiKey ? `AI Chat · ${PROVIDER_LABEL[provider]}` : "AI Chat · No key"}
+        </Pill>
       </div>
 
       {/* Message scroll area */}
@@ -129,15 +157,24 @@ export function ChatClient({ greeting }: { greeting: string }) {
 
       {error && (
         <div
-          className="mb-3 rounded-input px-3 py-2.5 text-sm"
+          className="mb-3 flex items-start justify-between gap-3 rounded-input px-3 py-2.5 text-sm"
           style={{
-            background: "rgba(239, 68, 68, 0.08)",
-            border: "1px solid rgba(239, 68, 68, 0.30)",
-            color: "#FCA5A5",
+            background: needsKey
+              ? "rgba(167, 139, 250, 0.08)"
+              : "rgba(239, 68, 68, 0.08)",
+            border: needsKey
+              ? "1px solid rgba(167, 139, 250, 0.30)"
+              : "1px solid rgba(239, 68, 68, 0.30)",
+            color: needsKey ? "#C4B5FD" : "#FCA5A5",
           }}
           role="alert"
         >
-          {error}
+          <span className="flex-1">{error}</span>
+          {needsKey && (
+            <Link href="/settings" className="btn btn-primary btn-sm flex-shrink-0">
+              <Sparkles size={12} /> Add key
+            </Link>
+          )}
         </div>
       )}
 

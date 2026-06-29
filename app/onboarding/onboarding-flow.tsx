@@ -804,37 +804,42 @@ function NumberStepper({
   min?: number;
   max?: number;
 }) {
+  // Compact layout — on a 375px viewport with grid-cols-2 + p-3 cards the
+  // inner usable width is ~140px. Old stepper was ~200px wide and bled
+  // past the right border, putting the + button outside the card.
   return (
-    <div className="flex items-center gap-3.5">
+    <div className="flex items-center justify-between gap-1.5 sm:justify-center sm:gap-3.5">
       <button
         type="button"
         onClick={() => onChange(Math.max(min, value - 1))}
-        className="stepper-btn flex h-9 w-9 items-center justify-center rounded-[10px] border"
+        className="stepper-btn flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-[10px] border"
         style={{
           background: "rgba(255,255,255,0.04)",
           borderColor: "var(--border-default)",
           color: "var(--text-primary)",
         }}
+        aria-label="Decrease"
       >
-        <Minus size={14} />
+        <Minus size={13} />
       </button>
-      <div className="min-w-[100px] text-center">
-        <span className="tabular text-[32px] font-extrabold leading-none text-cream">
+      <div className="flex-1 min-w-0 text-center sm:flex-none sm:min-w-[100px]">
+        <span className="tabular text-[26px] sm:text-[32px] font-extrabold leading-none text-cream">
           {value}
         </span>
-        <span className="ml-1.5 text-[13px] tertiary">hours</span>
+        <span className="ml-1 sm:ml-1.5 text-[11px] sm:text-[13px] tertiary">hours</span>
       </div>
       <button
         type="button"
         onClick={() => onChange(Math.min(max, value + 1))}
-        className="stepper-btn flex h-9 w-9 items-center justify-center rounded-[10px] border"
+        className="stepper-btn flex h-8 w-8 sm:h-9 sm:w-9 flex-shrink-0 items-center justify-center rounded-[10px] border"
         style={{
           background: "rgba(255,255,255,0.04)",
           borderColor: "var(--border-default)",
           color: "var(--text-primary)",
         }}
+        aria-label="Increase"
       >
-        <Plus size={14} />
+        <Plus size={13} />
       </button>
       <style>{`
         .stepper-btn { transition: all 180ms; cursor: pointer; }
@@ -911,19 +916,19 @@ function Step5({
         Your real life, not aspirational. The plan respects this.
       </p>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-4">
         <div
-          className="rounded-xl border p-5"
+          className="rounded-xl border p-3 sm:p-5"
           style={{ background: "rgba(255,255,255,0.025)", borderColor: "var(--border-default)" }}
         >
-          <div className="t-label tertiary mb-3.5">Weekdays</div>
+          <div className="t-label tertiary mb-3">Weekdays</div>
           <NumberStepper value={data.hoursWeekday} onChange={(v) => patch("hoursWeekday", v)} />
         </div>
         <div
-          className="rounded-xl border p-5"
+          className="rounded-xl border p-3 sm:p-5"
           style={{ background: "rgba(255,255,255,0.025)", borderColor: "var(--border-default)" }}
         >
-          <div className="t-label tertiary mb-3.5">Weekends</div>
+          <div className="t-label tertiary mb-3">Weekends</div>
           <NumberStepper value={data.hoursWeekend} onChange={(v) => patch("hoursWeekend", v)} />
         </div>
       </div>
