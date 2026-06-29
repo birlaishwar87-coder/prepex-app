@@ -20,6 +20,7 @@ interface ProviderMeta {
   name: string;
   tagline: string;
   description: string;
+  setupHint: string;
   Icon: typeof Sparkles;
   accent: string;
   recommended?: boolean;
@@ -27,29 +28,35 @@ interface ProviderMeta {
   getKeyLabel: string;
 }
 
+// Order matters (2026-06-29 v2): Groq first because Gemini key
+// creation blocks new Google accounts that don't have a GCP project.
+// See [[bug-gemini-no-cloud-projects]] — diagnosed during community demo.
 const PROVIDERS: ProviderMeta[] = [
-  {
-    id: "gemini",
-    name: "Google Gemini",
-    tagline: "RECOMMENDED · FREE TIER",
-    description:
-      "Google's Gemini 2.5 Flash. Generous free quota (1,500 requests/day). No credit card needed.",
-    Icon: Sparkles,
-    accent: "#A78BFA",
-    recommended: true,
-    getKeyUrl: "https://aistudio.google.com/app/apikey",
-    getKeyLabel: "Get Gemini API key",
-  },
   {
     id: "groq",
     name: "Groq LPU",
-    tagline: "FREE · FASTEST",
+    tagline: "EASIEST · FREE",
     description:
-      "Groq's llama-3.3-70b on dedicated inference hardware. Free tier capped at 100k tokens/day.",
+      "Llama 3.3 70B on dedicated inference. 100k tokens/day free. Setup takes 30 sec.",
+    setupHint: "Sign in with Google → API Keys → Create. No Cloud project needed.",
     Icon: Zap,
     accent: "#FF7A59",
+    recommended: true,
     getKeyUrl: "https://console.groq.com/keys",
-    getKeyLabel: "Get Groq API key",
+    getKeyLabel: "Get Groq API key (recommended)",
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    tagline: "BEST QUALITY · FREE",
+    description:
+      "Gemini 2.5 Flash. Generous free tier (~1,500 req/day). Needs a Google Cloud project — see hint below.",
+    setupHint:
+      "Click 'Create API key' → choose 'Create API key in NEW project' (not the dropdown). If you see 'No Cloud Projects Available', you picked the wrong path — go back and pick the new-project one.",
+    Icon: Sparkles,
+    accent: "#A78BFA",
+    getKeyUrl: "https://aistudio.google.com/app/apikey",
+    getKeyLabel: "Get Gemini API key",
   },
   {
     id: "anthropic",
@@ -57,6 +64,7 @@ const PROVIDERS: ProviderMeta[] = [
     tagline: "PAID · BEST QUALITY",
     description:
       "Claude Haiku 4.5. $5 trial credit on signup, then pay-as-you-go (~$1/M tokens).",
+    setupHint: "Sign up → Settings → API Keys → Create.",
     Icon: Cpu,
     accent: "#6EE7B7",
     getKeyUrl: "https://console.anthropic.com/settings/keys",
@@ -223,7 +231,20 @@ function ProviderCard({
         </div>
       </div>
 
-      <p className="mb-3 text-[12px] secondary leading-snug">{meta.description}</p>
+      <p className="mb-2 text-[12px] secondary leading-snug">{meta.description}</p>
+      <div
+        className="mb-3 rounded-input px-2.5 py-1.5 text-[10.5px] leading-relaxed"
+        style={{
+          background: `${meta.accent}10`,
+          border: `1px solid ${meta.accent}30`,
+          color: "var(--text-secondary)",
+        }}
+      >
+        <span className="font-bold uppercase tracking-wider" style={{ color: meta.accent }}>
+          Setup ·{" "}
+        </span>
+        {meta.setupHint}
+      </div>
 
       {!editing && currentKey ? (
         <div className="space-y-2">

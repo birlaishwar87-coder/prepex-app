@@ -18,42 +18,51 @@ import {
   saveAiKeyAction,
 } from "../../settings/actions";
 
-type Provider = "gemini" | "groq" | "anthropic";
+type Provider = "groq" | "gemini" | "anthropic";
 
+// Order matters (2026-06-29 v2): Groq first because Gemini key
+// creation blocks new Google accounts that don't have a GCP project
+// (the "No Cloud Projects Available" dead end Ishwar reported).
+// Groq has zero of that friction — Gmail sign-in → API Keys → Create → done.
 const PROVIDERS: Array<{
   id: Provider;
   name: string;
   tagline: string;
   description: string;
+  setupHint: string;
   Icon: typeof Sparkles;
   accent: string;
   getKeyUrl: string;
   recommended?: boolean;
 }> = [
   {
-    id: "gemini",
-    name: "Google Gemini",
-    tagline: "RECOMMENDED · FREE",
-    description: "1,500 requests/day on Gemini 2.5 Flash. No credit card.",
-    Icon: Sparkles,
-    accent: "#A78BFA",
-    getKeyUrl: "https://aistudio.google.com/app/apikey",
-    recommended: true,
-  },
-  {
     id: "groq",
     name: "Groq",
-    tagline: "FREE · FAST",
-    description: "Free tier, 100k tokens/day. Llama 3.3 70B.",
+    tagline: "EASIEST · 30 SEC SETUP",
+    description: "Llama 3.3 70B · 100k tokens/day free. No Cloud project needed.",
+    setupHint: "Sign in with Google → API Keys → Create — done.",
     Icon: Zap,
     accent: "#FF7A59",
     getKeyUrl: "https://console.groq.com/keys",
+    recommended: true,
+  },
+  {
+    id: "gemini",
+    name: "Google Gemini",
+    tagline: "BEST QUALITY · FREE",
+    description: "Gemini 2.5 Flash · generous free tier.",
+    setupHint:
+      "Click 'Create API key' → 'Create API key in NEW project' (not the dropdown). If you see 'No Cloud Projects Available', that means you picked the wrong option — go back and pick the new-project one.",
+    Icon: Sparkles,
+    accent: "#A78BFA",
+    getKeyUrl: "https://aistudio.google.com/app/apikey",
   },
   {
     id: "anthropic",
     name: "Anthropic",
     tagline: "PAID · BEST",
-    description: "Claude Haiku 4.5. $5 trial credit.",
+    description: "Claude Haiku 4.5 · $5 trial credit.",
+    setupHint: "Sign up → Settings → API Keys → Create.",
     Icon: Cpu,
     accent: "#6EE7B7",
     getKeyUrl: "https://console.anthropic.com/settings/keys",
@@ -68,7 +77,7 @@ const PROVIDERS: Array<{
  */
 export function AiKeyPrompt({ onConnected }: { onConnected?: () => void }) {
   const [open, setOpen] = useState(true);
-  const [activeProvider, setActiveProvider] = useState<Provider>("gemini");
+  const [activeProvider, setActiveProvider] = useState<Provider>("groq");
   const [draft, setDraft] = useState("");
   const [showKey, setShowKey] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -135,8 +144,9 @@ export function AiKeyPrompt({ onConnected }: { onConnected?: () => void }) {
           </div>
           <h2 className="t-h2 mb-1.5">Connect AI to enable Prepex.</h2>
           <p className="t-body secondary">
-            Pick a provider, grab a free key, paste it here. Each key only counts against your
-            own quota — no shared rate limits.
+            Pick a provider, grab a free key, paste it here.{" "}
+            <span className="cream-text font-semibold">Groq is the fastest setup</span> — 30
+            seconds, no Cloud project nonsense.
           </p>
         </div>
 
@@ -173,7 +183,18 @@ export function AiKeyPrompt({ onConnected }: { onConnected?: () => void }) {
           })}
         </div>
 
-        <p className="mb-3 text-[12.5px] secondary">{provider.description}</p>
+        <p className="mb-2 text-[12.5px] secondary">{provider.description}</p>
+        <div
+          className="mb-3 rounded-input px-3 py-2 text-[11.5px] leading-relaxed"
+          style={{
+            background: `${provider.accent}10`,
+            border: `1px solid ${provider.accent}30`,
+            color: "var(--text-secondary)",
+          }}
+        >
+          <span className="font-semibold cream-text">How to get it: </span>
+          {provider.setupHint}
+        </div>
 
         {/* Input */}
         <div className="mb-3 flex flex-col gap-2 sm:flex-row">
