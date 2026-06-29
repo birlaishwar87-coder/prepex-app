@@ -88,56 +88,115 @@ export default async function TodayPage() {
     );
   }
 
-  // ---- Today's plan + tasks ----
-  const { data: plan } = await supabase
-    .from("daily_plans")
-    .select("*")
-    .eq("user_id", user.id)
-    .eq("plan_date", planDate)
-    .maybeSingle<Tables<"daily_plans">>();
+  // ---- Parallelize all independent reads in a single round-trip ----
+  // Was: 7 sequential awaits, each adding ~50-150ms RTT on Supabase ap-northeast-1.
+  // Now: one Promise.all batch — total wait = max(query_times) not sum().
+  // taskRows + previewTasks remain sequential (need parent.id from plan/tomorrowPlan).
+  const tomorrow = addDays(planDate, 1);
+  const weekStart = addDays(planDate, -6);
+  const todayStart = `${planDate}T00:00:00Z`;
+  const tomorrowStart = `${addDays(planDate, 1)}T00:00:00Z`;
 
-  let tasks: Tables<"tasks">[] = [];
-  if (plan) {
-    const { data: taskRows } = await supabase
-      .from("tasks")
+  const [
+    { data: plan },
+    { data: checkin },
+    heatmap,
+    { data: topicStates },
+    { data: tomorrowPlan },
+    { data: weekPlans },
+    { data: todayFocusRows },
+  ] = await Promise.all([
+    supabase
+      .from("daily_plans")
       .select("*")
-      .eq("plan_id", plan.id)
-      .order("task_order", { ascending: true })
-      .returns<Tables<"tasks">[]>();
-    tasks = taskRows ?? [];
-  }
+      .eq("user_id", user.id)
+      .eq("plan_date", planDate)
+      .maybeSingle<Tables<"daily_plans">>(),
+    supabase
+      .from("daily_checkins")
+      .select("response, skipped")
+      .eq("user_id", user.id)
+      .eq("checkin_date", planDate)
+      .maybeSingle<{ response: string | null; skipped: boolean | null }>(),
+    buildHeatmap(user.id, planDate),
+    supabase
+      .from("user_topic_state")
+      .select("id, chapter_id, chapters(name, subject)")
+      .eq("user_id", user.id)
+      .eq("phase", "in_revision")
+      .returns<
+        Array<{
+          id: string;
+          chapter_id: string;
+          chapters: { name: string; subject: "physics" | "chemistry" | "maths" } | null;
+        }>
+      >(),
+    supabase
+      .from("daily_plans")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("plan_date", tomorrow)
+      .maybeSingle<{ id: string }>(),
+    supabase
+      .from("daily_plans")
+      .select("completed_minutes, completed_tasks, total_tasks")
+      .eq("user_id", user.id)
+      .gte("plan_date", weekStart)
+      .lte("plan_date", planDate)
+      .returns<
+        Array<{
+          completed_minutes: number | null;
+          completed_tasks: number | null;
+          total_tasks: number | null;
+        }>
+      >(),
+    supabase
+      .from("focus_sessions")
+      .select("actual_duration_sec")
+      .eq("user_id", user.id)
+      .gte("started_at", todayStart)
+      .lt("started_at", tomorrowStart)
+      .returns<Array<{ actual_duration_sec: number | null }>>(),
+  ]);
 
-  // ---- Today's check-in ----
-  const { data: checkin } = await supabase
-    .from("daily_checkins")
-    .select("response, skipped")
-    .eq("user_id", user.id)
-    .eq("checkin_date", planDate)
-    .maybeSingle<{
-      response: string | null;
-      skipped: boolean | null;
-    }>();
+  // ---- Sequential reads that depend on parent IDs from the batch above ----
+  const [tasks, tomorrowPreviewRows] = await Promise.all([
+    plan
+      ? supabase
+          .from("tasks")
+          .select("*")
+          .eq("plan_id", plan.id)
+          .order("task_order", { ascending: true })
+          .returns<Tables<"tasks">[]>()
+          .then((r) => r.data ?? [])
+      : Promise.resolve([] as Tables<"tasks">[]),
+    tomorrowPlan
+      ? supabase
+          .from("tasks")
+          .select("subject, chapter, estimated_minutes, task_type")
+          .eq("plan_id", tomorrowPlan.id)
+          .order("task_order", { ascending: true })
+          .limit(4)
+          .returns<
+            Array<{
+              subject: string;
+              chapter: string | null;
+              estimated_minutes: number;
+              task_type: string;
+            }>
+          >()
+          .then((r) => r.data ?? [])
+      : Promise.resolve(
+          [] as Array<{
+            subject: string;
+            chapter: string | null;
+            estimated_minutes: number;
+            task_type: string;
+          }>
+        ),
+  ]);
 
-  // ---- 28-day streak heatmap from completed_tasks ----
-  // Build 28 days going back from planDate. Intensity 0..4 based on
-  // completion percentage that day.
-  const heatmap = await buildHeatmap(user.id, planDate);
-
-  // ---- Topic-state map for routing /today revision tasks ----
-  // Build chapter_id → topic_state_id and chapter_id → chapter meta.
-  const { data: topicStates } = await supabase
-    .from("user_topic_state")
-    .select("id, chapter_id, chapters(name, subject)")
-    .eq("user_id", user.id)
-    .eq("phase", "in_revision")
-    .returns<
-      Array<{
-        id: string;
-        chapter_id: string;
-        chapters: { name: string; subject: "physics" | "chemistry" | "maths" } | null;
-      }>
-    >();
-
+  // ---- Decorate batch results ----
   const revisionTopicStateByChapter: Record<string, string> = {};
   const chapterMetaById: Record<
     string,
@@ -153,53 +212,15 @@ export default async function TodayPage() {
     }
   }
 
-  // ---- Tomorrow preview ----
-  const tomorrow = addDays(planDate, 1);
-  const { data: tomorrowPlan } = await supabase
-    .from("daily_plans")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("plan_date", tomorrow)
-    .maybeSingle<{ id: string }>();
-  let tomorrowPreview: RightPanelData["tomorrowPreview"] = [];
-  if (tomorrowPlan) {
-    const { data: previewTasks } = await supabase
-      .from("tasks")
-      .select("subject, chapter, estimated_minutes, task_type")
-      .eq("plan_id", tomorrowPlan.id)
-      .order("task_order", { ascending: true })
-      .limit(4)
-      .returns<
-        Array<{
-          subject: string;
-          chapter: string | null;
-          estimated_minutes: number;
-          task_type: string;
-        }>
-      >();
-    tomorrowPreview = (previewTasks ?? []).map((t) => ({
+  const tomorrowPreview: RightPanelData["tomorrowPreview"] = tomorrowPreviewRows.map(
+    (t) => ({
       subject: t.subject,
       chapter: t.chapter,
       minutes: t.estimated_minutes,
       type: t.task_type,
-    }));
-  }
+    })
+  );
 
-  // ---- Week stats ----
-  const weekStart = addDays(planDate, -6);
-  const { data: weekPlans } = await supabase
-    .from("daily_plans")
-    .select("completed_minutes, completed_tasks, total_tasks")
-    .eq("user_id", user.id)
-    .gte("plan_date", weekStart)
-    .lte("plan_date", planDate)
-    .returns<
-      Array<{
-        completed_minutes: number | null;
-        completed_tasks: number | null;
-        total_tasks: number | null;
-      }>
-    >();
   const weekFocusedMinutes =
     weekPlans?.reduce((acc, p) => acc + (p.completed_minutes ?? 0), 0) ?? 0;
   const weekDone =
@@ -209,19 +230,6 @@ export default async function TodayPage() {
   const completionRatePct =
     weekTotal === 0 ? 0 : Math.round((weekDone / weekTotal) * 100);
 
-  // ---- Focus Mode stats for today ----
-  // `started_at >= today 00:00` filter scoped to the user. We sum
-  // actual_duration_sec across all sessions started today (including
-  // terminated-early ones — every minute spent focused counts).
-  const todayStart = `${planDate}T00:00:00Z`;
-  const tomorrowStart = `${addDays(planDate, 1)}T00:00:00Z`;
-  const { data: todayFocusRows } = await supabase
-    .from("focus_sessions")
-    .select("actual_duration_sec")
-    .eq("user_id", user.id)
-    .gte("started_at", todayStart)
-    .lt("started_at", tomorrowStart)
-    .returns<Array<{ actual_duration_sec: number | null }>>();
   const focusMinutesToday = Math.round(
     (todayFocusRows ?? []).reduce((acc, r) => acc + (r.actual_duration_sec ?? 0), 0) / 60
   );

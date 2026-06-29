@@ -62,6 +62,8 @@ export type InitialData = {
   windows: TimeWindow[] | null;
 };
 
+type StudyDepth = "partial" | "full";
+
 type FlowData = {
   goal: Goal | null;
   examDate: string;
@@ -73,7 +75,8 @@ type FlowData = {
   hoursWeekend: number;
   sameDailyTarget: boolean;
   windows: TimeWindow[];
-  studiedChapterIds: Set<string>;
+  // Map<chapter_id, depth> — chapter absent from map = not studied at all
+  studiedChapters: Map<string, StudyDepth>;
 };
 
 const TOTAL_STEPS = 7;
@@ -102,7 +105,7 @@ export function OnboardingFlow({
     hoursWeekend: initialData.hoursWeekend ?? 8,
     sameDailyTarget: initialData.sameDailyTarget ?? false,
     windows: initialData.windows ?? [],
-    studiedChapterIds: new Set(),
+    studiedChapters: new Map(),
   }));
 
   function patch<K extends keyof FlowData>(key: K, value: FlowData[K]) {
@@ -1035,23 +1038,33 @@ function Step6({
     return g;
   }, [chapters]);
 
-  function toggle(id: string) {
-    const s = new Set(data.studiedChapterIds);
-    if (s.has(id)) s.delete(id);
-    else s.add(id);
-    patch("studiedChapterIds", s);
+  // 3-state cycle: not-studied → partial → full → not-studied
+  function cycle(id: string) {
+    const m = new Map(data.studiedChapters);
+    const current = m.get(id);
+    if (!current) m.set(id, "partial");
+    else if (current === "partial") m.set(id, "full");
+    else m.delete(id);
+    patch("studiedChapters", m);
   }
-  function markAll() {
-    patch("studiedChapterIds", new Set(chapters.map((c) => c.id)));
+  function markAllFull() {
+    const m = new Map<string, StudyDepth>();
+    for (const c of chapters) m.set(c.id, "full");
+    patch("studiedChapters", m);
   }
   function clearAll() {
-    patch("studiedChapterIds", new Set());
+    patch("studiedChapters", new Map());
   }
 
   function commit() {
     setError(null);
     startTransition(async () => {
-      const res = await saveTopicsAction({ chapterIds: Array.from(data.studiedChapterIds) });
+      const res = await saveTopicsAction({
+        chapters: Array.from(data.studiedChapters.entries()).map(([id, depth]) => ({
+          id,
+          depth,
+        })),
+      });
       if (res.error) {
         setError(res.error);
         return;
@@ -1060,7 +1073,10 @@ function Step6({
     });
   }
 
-  const totalChecked = data.studiedChapterIds.size;
+  const totalChecked = data.studiedChapters.size;
+  const totalPartial = Array.from(data.studiedChapters.values()).filter(
+    (d) => d === "partial"
+  ).length;
 
   return (
     <StepShell
@@ -1073,17 +1089,31 @@ function Step6({
     >
       <h1 className="t-h2 mb-2 text-center">Which chapters have you studied?</h1>
       <p className="t-body-sm secondary text-center">
-        Tap to mark studied. Even partial study counts.
+        Tap once for partial, again for fully studied.
       </p>
       <p className="t-body-sm tertiary mb-5 mt-1.5 text-center">
-        Marked chapters skip new learning and go straight to revision rotation.
+        Partial chapters revisit sooner. Fully studied chapters go into revision rotation.
       </p>
 
-      <div className="mb-3.5 flex items-center justify-between">
-        <div className="pill pill-coral tabular">{totalChecked} chapters marked</div>
+      <div className="mb-3.5 flex items-center justify-between flex-wrap gap-2">
+        <div className="flex gap-1.5 flex-wrap">
+          <div className="pill pill-coral tabular">{totalChecked} marked</div>
+          {totalPartial > 0 && (
+            <div
+              className="pill tabular"
+              style={{
+                background: "rgba(167, 139, 250, 0.12)",
+                borderColor: "rgba(167, 139, 250, 0.30)",
+                color: "#C4B5FD",
+              }}
+            >
+              {totalPartial} partial
+            </div>
+          )}
+        </div>
         <div className="flex gap-2">
-          <button type="button" onClick={markAll} className="btn btn-text btn-sm">
-            Mark all
+          <button type="button" onClick={markAllFull} className="btn btn-text btn-sm">
+            All full
           </button>
           <button type="button" onClick={clearAll} className="btn btn-text btn-sm">
             Clear
@@ -1095,7 +1125,7 @@ function Step6({
         {(Object.keys(grouped) as Array<"physics" | "chemistry" | "maths">).map((subj) => {
           const open = openSubj === subj;
           const list = grouped[subj];
-          const count = list.filter((c) => data.studiedChapterIds.has(c.id)).length;
+          const count = list.filter((c) => data.studiedChapters.has(c.id)).length;
           return (
             <div
               key={subj}
@@ -1143,35 +1173,74 @@ function Step6({
               >
                 <div className="grid grid-cols-1 gap-1.5 px-[18px] pb-[18px] md:grid-cols-2">
                   {list.map((ch) => {
-                    const checked = data.studiedChapterIds.has(ch.id);
+                    const depth = data.studiedChapters.get(ch.id);
+                    const isPartial = depth === "partial";
+                    const isFull = depth === "full";
+                    const isMarked = isPartial || isFull;
+                    // Color scheme:
+                    //   none    → muted border, transparent bg
+                    //   partial → purple accent (mid-progress)
+                    //   full    → coral accent (completed)
+                    const borderColor = isFull
+                      ? "var(--coral)"
+                      : isPartial
+                        ? "rgba(167, 139, 250, 0.65)"
+                        : "var(--border-hover)";
+                    const bgColor = isFull
+                      ? "var(--coral)"
+                      : isPartial
+                        ? "rgba(167, 139, 250, 0.85)"
+                        : "transparent";
+                    const rowBg = isFull
+                      ? "rgba(255, 122, 89, 0.08)"
+                      : isPartial
+                        ? "rgba(167, 139, 250, 0.07)"
+                        : "transparent";
                     return (
                       <button
                         key={ch.id}
                         type="button"
-                        onClick={() => toggle(ch.id)}
+                        onClick={() => cycle(ch.id)}
                         className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-all"
                         style={{
-                          background: checked ? "rgba(255, 122, 89, 0.08)" : "transparent",
+                          background: rowBg,
                           color: "inherit",
                           transitionDuration: "160ms",
                         }}
+                        aria-label={`${ch.name} — ${
+                          isFull ? "fully studied" : isPartial ? "partially studied" : "not studied"
+                        }`}
                       >
                         <div
                           className="flex h-[18px] w-[18px] flex-shrink-0 items-center justify-center rounded-[5px] border-[1.5px]"
                           style={{
-                            borderColor: checked ? "var(--coral)" : "var(--border-hover)",
-                            background: checked ? "var(--coral)" : "transparent",
+                            borderColor,
+                            background: bgColor,
                             transition: "all 180ms",
                           }}
                         >
-                          {checked && <Check size={11} stroke="#050010" strokeWidth={3.5} />}
+                          {isFull && <Check size={11} stroke="#050010" strokeWidth={3.5} />}
+                          {isPartial && (
+                            <div
+                              className="h-[7px] w-[7px] rounded-[1.5px]"
+                              style={{ background: "#050010" }}
+                            />
+                          )}
                         </div>
                         <span
-                          className="text-[13px]"
-                          style={{ color: checked ? "var(--cream)" : "var(--text-secondary)" }}
+                          className="flex-1 text-[13px]"
+                          style={{ color: isMarked ? "var(--cream)" : "var(--text-secondary)" }}
                         >
                           {ch.name}
                         </span>
+                        {isPartial && (
+                          <span
+                            className="text-[10px] font-bold uppercase tracking-wider"
+                            style={{ color: "#C4B5FD" }}
+                          >
+                            Partial
+                          </span>
+                        )}
                       </button>
                     );
                   })}
@@ -1362,7 +1431,7 @@ function Step7({ data }: { data: FlowData }) {
     },
     {
       ok: true,
-      text: `${data.studiedChapterIds.size} chapters already studied`,
+      text: `${data.studiedChapters.size} chapters already studied`,
     },
     {
       ok: !!data.coachingName,

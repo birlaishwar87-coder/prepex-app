@@ -40,14 +40,14 @@ export function AddTaskModal({
 
   return (
     <Modal open={open} onClose={onClose} width={540}>
-      <div className="p-7">
-        <div className="mb-5 flex items-center justify-between">
+      <div className="p-5 sm:p-7">
+        <div className="mb-4 sm:mb-5 flex items-center justify-between gap-2">
           <h2 className="t-h3">Add custom task</h2>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="flex h-8 w-8 items-center justify-center rounded-lg"
+            className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg"
             style={{ background: "rgba(255,255,255,0.04)", color: "var(--text-secondary)" }}
           >
             <X size={16} />
@@ -66,7 +66,7 @@ export function AddTaskModal({
             <label htmlFor="task_chapter">Chapter or task name</label>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <SelectField
               id="task_subject"
               name="subject"
@@ -84,7 +84,7 @@ export function AddTaskModal({
           <div>
             <div className="t-label tertiary mb-2">Task type</div>
             <input type="hidden" name="task_type" value={taskType} />
-            <div className="grid grid-cols-4 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {TASK_TYPES.map((t) => (
                 <button
                   key={t.id}
@@ -105,7 +105,7 @@ export function AddTaskModal({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <div className="t-label tertiary mb-2">Duration</div>
               <input type="hidden" name="duration" value={duration} />
@@ -138,13 +138,16 @@ export function AddTaskModal({
             <div>
               <div className="t-label tertiary mb-2">Time slot</div>
               <input type="hidden" name="time_window" value={window} />
-              <div className="grid grid-cols-5 gap-1">
+              {/* 3-col grid wraps 5 buttons into 3+2 rows on mobile; on
+                  desktop the buttons get wider with text-[11px] but still
+                  fit 5 across. */}
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
                 {WINDOWS.map((w) => (
                   <button
                     key={w}
                     type="button"
                     onClick={() => setWindow(w)}
-                    className="rounded-[9px] border px-1 py-2 text-[10px] font-semibold capitalize"
+                    className="rounded-[9px] border px-1.5 py-2 text-[11px] sm:text-[10.5px] font-semibold capitalize whitespace-nowrap"
                     style={{
                       background:
                         window === w ? "rgba(255,122,89,0.18)" : "rgba(255,255,255,0.03)",
@@ -210,25 +213,33 @@ function SelectField({
   onChange: (v: string) => void;
   options: Array<{ value: string; label: string }>;
 }) {
+  // Standalone select — NOT using .field float-label CSS because that
+  // pattern relies on :placeholder-shown which selects don't support
+  // (the label was overlapping the value on mobile: "Subject"+"Physics").
   return (
-    <div className="field relative">
+    <div className="relative">
+      <label
+        htmlFor={id}
+        className="t-label tertiary mb-2 block"
+      >
+        {label}
+      </label>
       <select
         id={id}
         name={name}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full appearance-none capitalize"
+        className="w-full appearance-none capitalize cursor-pointer"
         style={{
-          height: 56,
-          padding: "22px 12px 8px",
+          height: 44,
+          padding: "0 32px 0 12px",
           background: "var(--bg-input)",
           border: "1px solid var(--border-default)",
           borderRadius: 10,
           color: "var(--cream)",
           outline: "none",
-          fontSize: 15,
+          fontSize: 14,
           fontFamily: "inherit",
-          cursor: "pointer",
         }}
       >
         {options.map((o) => (
@@ -237,12 +248,11 @@ function SelectField({
           </option>
         ))}
       </select>
-      <label htmlFor={id}>{label}</label>
       <div
         className="pointer-events-none absolute right-3"
-        style={{ top: 18, color: "var(--text-tertiary)" }}
+        style={{ bottom: 14, color: "var(--text-tertiary)" }}
       >
-        <ChevronDown size={16} />
+        <ChevronDown size={14} />
       </div>
     </div>
   );

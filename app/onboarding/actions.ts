@@ -25,8 +25,12 @@ export type HoursInput = {
   sameDailyTarget: boolean;
   windows: TimeWindow[];
 };
-// chapterIds: only valid chapter UUIDs from the seeded master list.
-export type TopicsInput = { chapterIds: string[] };
+// chapters: per-chapter study depth ('partial' or 'full' — chapters not
+// included are implicitly 'none' and not inserted as user_topic_state rows).
+// chapter.id must be a valid UUID from the seeded master list.
+export type TopicsInput = {
+  chapters: Array<{ id: string; depth: "partial" | "full" }>;
+};
 
 // ============================================================
 // Helpers
@@ -134,26 +138,37 @@ export async function saveHoursAction(input: HoursInput) {
 
 // ============================================================
 // Step 6 — Topics studied (the big one)
-// Seeds user_topic_state rows with onboarding_marked=true and
-// next_revision_due = today + 7d (PRD §2.2.3 locked logic).
+// Seeds user_topic_state rows with onboarding_marked=true. study_depth
+// captures the 3-state picker (partial vs full); the plan generator
+// uses this to refuse to advance past a partial chapter in a subject.
+// next_revision_due = today + 7d for 'full' chapters (PRD §2.2.3),
+// today + 3d for 'partial' — they need more revisits sooner.
 // ============================================================
 export async function saveTopicsAction(input: TopicsInput) {
   const { supabase, user } = await requireUser();
 
-  if (input.chapterIds.length > 0) {
-    const sevenDaysOut = new Date();
-    sevenDaysOut.setDate(sevenDaysOut.getDate() + 7);
-    const due = sevenDaysOut.toISOString().slice(0, 10);
+  if (input.chapters.length > 0) {
     const now = new Date().toISOString();
+    const fullDue = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      return d.toISOString().slice(0, 10);
+    })();
+    const partialDue = (() => {
+      const d = new Date();
+      d.setDate(d.getDate() + 3);
+      return d.toISOString().slice(0, 10);
+    })();
 
-    const rows: TablesInsert<"user_topic_state">[] = input.chapterIds.map((chapterId) => ({
+    const rows: TablesInsert<"user_topic_state">[] = input.chapters.map((c) => ({
       user_id: user.id,
-      chapter_id: chapterId,
+      chapter_id: c.id,
       phase: "in_revision",
       first_studied_at: now,
-      next_revision_due: due,
-      current_interval_days: 7,
+      next_revision_due: c.depth === "full" ? fullDue : partialDue,
+      current_interval_days: c.depth === "full" ? 7 : 3,
       onboarding_marked: true,
+      study_depth: c.depth,
     }));
 
     // ON CONFLICT (user_id, chapter_id, topic): the unique constraint on

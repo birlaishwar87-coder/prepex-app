@@ -340,7 +340,12 @@ async function brandPdf(buf, ctx) {
       const page = pages[i];
       const { width, height } = page.getSize();
 
-      const HEADER_HEIGHT = 56;
+      // Header reduced from 56px → 30px (2026-06-29). Community feedback:
+      // the 56px band was clipping the top line of note content on some
+      // PDFs. Dropping the "Plan Execute Survive Win" tagline (redundant
+      // — the wordmark already carries the brand) and using a single-line
+      // header. Subject/chapter still on the right; just smaller font.
+      const HEADER_HEIGHT = 30;
 
       // Indigo → purple gradient cover band — hides existing third-party header.
       drawHeaderGradient(page, width, height, HEADER_HEIGHT);
@@ -349,61 +354,58 @@ async function brandPdf(buf, ctx) {
         x: 0,
         y: height - HEADER_HEIGHT,
         width,
-        height: 2.5,
+        height: 1.5,
         color: COLOR_CORAL,
       });
 
-      // "Prepex" wordmark — coral bold 18pt
+      // "Prepex" wordmark — coral bold 13pt (was 18pt for the taller band).
+      const WORDMARK_SIZE = 13;
+      const wordmarkY = height - HEADER_HEIGHT + 9; // baseline inside 30px band
       page.drawText("Prepex", {
-        x: 22,
-        y: height - 26,
-        size: 18,
+        x: 18,
+        y: wordmarkY,
+        size: WORDMARK_SIZE,
         font: helvBold,
         color: COLOR_CORAL,
       });
       // Coral dot
-      const prepexW = helvBold.widthOfTextAtSize("Prepex", 18);
+      const prepexW = helvBold.widthOfTextAtSize("Prepex", WORDMARK_SIZE);
       page.drawText(".", {
-        x: 22 + prepexW,
-        y: height - 26,
-        size: 18,
+        x: 18 + prepexW,
+        y: wordmarkY,
+        size: WORDMARK_SIZE,
         font: helvBold,
         color: COLOR_CORAL,
       });
 
-      // Tagline: cream "Plan Execute Survive" + coral "Win"
-      page.drawText(TAGLINE_PREFIX, {
-        x: 22,
-        y: height - 46,
-        size: 8,
-        font: helv,
-        color: COLOR_CREAM,
-      });
-      const taglinePrefixW = helv.widthOfTextAtSize(TAGLINE_PREFIX, 8);
-      page.drawText(TAGLINE_END, {
-        x: 22 + taglinePrefixW,
-        y: height - 46,
-        size: 8,
-        font: helvBold,
-        color: COLOR_CORAL,
-      });
-
-      // Right side of header — subject  chapter (cream on the dark gradient)
-      const subjectChapW = helvBold.widthOfTextAtSize(subjectChap, 8.5);
-      page.drawText(subjectChap, {
-        x: width - subjectChapW - 22,
-        y: height - 24,
-        size: 8.5,
-        font: helvBold,
-        color: COLOR_CREAM,
-      });
-      const typeW = helv.widthOfTextAtSize(typeText, 7.5);
+      // Right side of header — subject · chapter on a single line.
+      // Now the WHOLE label sits at the same baseline as the wordmark.
+      const subjectChapW = helvBold.widthOfTextAtSize(subjectChap, 8);
+      const typeW = helv.widthOfTextAtSize(typeText, 7);
+      // type label sits LEFT of the subject·chapter, separated by " · "
+      const sepW = helv.widthOfTextAtSize("  ·  ", 7);
+      const rightLabelStartX =
+        width - subjectChapW - sepW - typeW - 18;
       page.drawText(typeText, {
-        x: width - typeW - 22,
-        y: height - 42,
-        size: 7.5,
+        x: rightLabelStartX,
+        y: wordmarkY + 1,
+        size: 7,
         font: helv,
         color: rgb(200 / 255, 200 / 255, 220 / 255),
+      });
+      page.drawText("  ·  ", {
+        x: rightLabelStartX + typeW,
+        y: wordmarkY + 1,
+        size: 7,
+        font: helv,
+        color: rgb(200 / 255, 200 / 255, 220 / 255),
+      });
+      page.drawText(subjectChap, {
+        x: rightLabelStartX + typeW + sepW,
+        y: wordmarkY,
+        size: 8,
+        font: helvBold,
+        color: COLOR_CREAM,
       });
 
       // Bottom-right corner mark. Small white pad covers any

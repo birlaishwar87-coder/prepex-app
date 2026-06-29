@@ -52,6 +52,11 @@ export interface PlanContext {
     subject: "physics" | "chemistry" | "maths";
     last_difficulty: "easy" | "medium" | "hard" | null;
     days_since_revised: number | null;
+    /** 'partial' = user marked this chapter as partially studied during
+     *  onboarding (or later). Plan generator must NOT pull new_learning
+     *  tasks from chapters that come AFTER a partial one in chapter_order
+     *  for the same subject. 'full' / null = fully studied (default). */
+    study_depth: "partial" | "full";
   }>;
 
   revisions_due: Array<{

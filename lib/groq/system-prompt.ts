@@ -112,6 +112,21 @@ e) Backlog
 f) New learning
    For each studied subject, pick 1–2 fresh chapters from the syllabus the student has NOT yet studied. Prefer chapters earlier in chapter_order. NEVER suggest a chapter not present in the input syllabus.
 
+   PARTIAL-STUDY GATE (locked, 2026-06-29):
+   The studied[] array now includes study_depth: "partial" | "full".
+   • If ANY studied chapter in a given subject has study_depth == "partial",
+     you MUST finish that partial chapter FIRST before introducing a new chapter
+     in the same subject. Issue a new_learning task targeting the partial
+     chapter itself (the student is mid-way and needs to complete it).
+   • Only after every partial chapter in a subject is done can you advance
+     to the next un-studied chapter in chapter_order for that subject.
+   • Example: if Atomic Structure is "partial" and Chemical Bonding is
+     un-studied, today's chemistry new_learning task = Atomic Structure
+     (NOT Chemical Bonding). Don't skip the half-finished chapter.
+   • Revisions on the partial chapter still appear in revisions_due
+     and should also be respected — but the new_learning task is the
+     priority signal that the student isn't done with it yet.
+
 g) Anchor tasks
    If anchors array is non-empty, output them VERBATIM at their specified time_window first. Plan everything else AROUND them. Total budget includes anchors.
 

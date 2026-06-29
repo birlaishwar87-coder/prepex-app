@@ -103,12 +103,14 @@ export function AiKeyPrompt({ onConnected }: { onConnected?: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto p-4"
+      // items-start on mobile so the modal stays visible above the soft
+      // keyboard. 100dvh tracks the dynamic viewport for accurate sizing.
+      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center overflow-y-auto px-3 py-4 sm:p-4"
       style={{ background: "rgba(0,0,0,0.65)", backdropFilter: "blur(4px)" }}
     >
       <div
-        className="glass relative w-full max-w-[640px]"
-        style={{ padding: 28, background: "rgba(20, 8, 40, 0.92)" }}
+        className="glass relative my-auto w-full max-w-[640px] max-h-[calc(100dvh-32px)] overflow-auto"
+        style={{ padding: 24, background: "rgba(20, 8, 40, 0.92)" }}
       >
         <button
           type="button"

@@ -97,7 +97,7 @@ export async function gatherPlanContext(args: {
   const { data: topicStatesRaw } = await supabase
     .from("user_topic_state")
     .select(
-      "id, chapter_id, phase, last_revised_at, next_revision_due, latest_difficulty_rating, revision_count, chapters(name, subject)"
+      "id, chapter_id, phase, study_depth, last_revised_at, next_revision_due, latest_difficulty_rating, revision_count, chapters(name, subject)"
     )
     .eq("user_id", args.userId)
     .returns<
@@ -105,6 +105,7 @@ export async function gatherPlanContext(args: {
         id: string;
         chapter_id: string;
         phase: "not_started" | "in_revision" | "mastered";
+        study_depth: "none" | "partial" | "full" | null;
         last_revised_at: string | null;
         next_revision_due: string | null;
         latest_difficulty_rating: "easy" | "medium" | "hard" | null;
@@ -129,6 +130,8 @@ export async function gatherPlanContext(args: {
         subject: t.chapters.subject,
         last_difficulty: t.latest_difficulty_rating,
         days_since_revised: daysSince,
+        // Default 'full' for legacy rows where the column wasn't set.
+        study_depth: t.study_depth === "partial" ? "partial" : "full",
       });
       if (t.next_revision_due && t.next_revision_due <= today) {
         const overdue = daysBetween(t.next_revision_due, today);

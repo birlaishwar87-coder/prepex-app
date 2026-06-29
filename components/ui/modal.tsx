@@ -41,7 +41,11 @@ export function Modal({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center p-4 animate-modal-in"
+      // items-start + padding on mobile keeps the modal above the soft
+      // keyboard (visualViewport shrinks but layout viewport doesn't).
+      // sm:items-center restores desktop behavior.
+      // 100dvh tracks the dynamic viewport so the modal never overflows.
+      className="fixed inset-0 z-[200] flex items-start sm:items-center justify-center px-3 py-4 sm:p-4 animate-modal-in overflow-y-auto"
       style={{ background: "rgba(0,0,0,0.75)", backdropFilter: "blur(8px)" }}
       onClick={dismissOnBackdrop ? onClose : undefined}
       role="dialog"
@@ -51,7 +55,7 @@ export function Modal({
       <div
         onClick={(e) => e.stopPropagation()}
         className={cn(
-          "max-h-[calc(100vh-32px)] overflow-auto rounded-modal animate-modal-content-in",
+          "my-auto max-h-[calc(100dvh-32px)] overflow-auto rounded-modal animate-modal-content-in",
           "border border-border-hover"
         )}
         style={{

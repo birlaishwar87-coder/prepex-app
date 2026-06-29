@@ -1109,6 +1109,7 @@ export type Database = {
           onboarding_marked: boolean | null
           phase: Database["public"]["Enums"]["topic_phase_t"]
           revision_count: number | null
+          study_depth: Database["public"]["Enums"]["study_depth_t"] | null
           topic: string | null
           updated_at: string | null
           user_id: string
@@ -1128,6 +1129,7 @@ export type Database = {
           onboarding_marked?: boolean | null
           phase?: Database["public"]["Enums"]["topic_phase_t"]
           revision_count?: number | null
+          study_depth?: Database["public"]["Enums"]["study_depth_t"] | null
           topic?: string | null
           updated_at?: string | null
           user_id: string
@@ -1147,6 +1149,7 @@ export type Database = {
           onboarding_marked?: boolean | null
           phase?: Database["public"]["Enums"]["topic_phase_t"]
           revision_count?: number | null
+          study_depth?: Database["public"]["Enums"]["study_depth_t"] | null
           topic?: string | null
           updated_at?: string | null
           user_id?: string
@@ -1241,6 +1244,7 @@ export type Database = {
         | "student_ended"
         | "threshold_resolved"
       recovery_type_t: "backlog" | "burnout"
+      study_depth_t: "none" | "partial" | "full"
       subject_t: "physics" | "chemistry" | "maths" | "revision" | "wellness"
       syllabus_tag_t: "jee_main" | "jee_advanced" | "both"
       task_status_t: "pending" | "completed" | "skipped" | "removed"
@@ -1461,6 +1465,7 @@ export const Constants = {
         "threshold_resolved",
       ],
       recovery_type_t: ["backlog", "burnout"],
+      study_depth_t: ["none", "partial", "full"],
       subject_t: ["physics", "chemistry", "maths", "revision", "wellness"],
       syllabus_tag_t: ["jee_main", "jee_advanced", "both"],
       task_status_t: ["pending", "completed", "skipped", "removed"],

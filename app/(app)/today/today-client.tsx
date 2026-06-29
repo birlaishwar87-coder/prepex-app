@@ -163,11 +163,29 @@ export function TodayClient({
               : `${tasks.length} tasks · ${totalHours}h`}
           </h2>
         </div>
-        {tasks.length > 0 && (
-          <span className="tabular text-[13px] secondary">
-            {done}/{tasks.length} done
-          </span>
-        )}
+        <div className="flex items-center gap-3">
+          {tasks.length > 0 && (
+            <span className="tabular text-[13px] secondary">
+              {done}/{tasks.length} done
+            </span>
+          )}
+          {/* Always-visible Add task button — Aryan reported this wasn't
+              discoverable. Previously only at the bottom and only when
+              a plan existed. */}
+          <button
+            type="button"
+            onClick={() => setAddOpen(true)}
+            aria-label="Add custom task"
+            className="flex h-9 items-center gap-1.5 rounded-full border px-3 text-[12.5px] font-semibold"
+            style={{
+              background: "rgba(255, 122, 89, 0.12)",
+              borderColor: "rgba(255, 122, 89, 0.40)",
+              color: "var(--coral-lighter)",
+            }}
+          >
+            <Plus size={13} /> Add task
+          </button>
+        </div>
       </div>
 
       {/* Empty state — covered by Phase 5's generate path. */}
@@ -200,14 +218,15 @@ export function TodayClient({
         </div>
       )}
 
-      {/* Bottom actions */}
+      {/* Bottom actions — Add custom task is also promoted to the plan
+          header (always visible); kept here for users who scroll past. */}
       {plan && (
         <div className="mt-7 flex flex-wrap gap-2.5">
-          <button type="button" className="btn btn-ghost" onClick={() => setAddOpen(true)}>
-            <Plus size={14} /> Add custom task
-          </button>
           <button type="button" className="btn btn-ghost" onClick={() => setRegenOpen(true)}>
             <RefreshCw size={14} /> Regenerate plan
+          </button>
+          <button type="button" className="btn btn-ghost" onClick={() => setAddOpen(true)}>
+            <Plus size={14} /> Add another task
           </button>
         </div>
       )}
