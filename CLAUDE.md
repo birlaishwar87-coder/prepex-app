@@ -64,7 +64,7 @@ Older-sibling tone. The brand guide §05 has a hard banlist. Anything I write �
 | `NEXT_PUBLIC_SUPABASE_URL` | browser + server | yes |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | browser + server | yes |
 | `SUPABASE_SERVICE_ROLE_KEY` | server only | yes (for admin ops) |
-| `GROQ_API_KEY` | server only | yes (Phase 5+) |
+| `GEMINI_API_KEY` / `ANTHROPIC_API_KEY` / `GROQ_API_KEY` | server only | optional in BYOK era — only used as fallback when a user has no key on profile |
 | `NEXT_PUBLIC_MIXPANEL_TOKEN` | browser | optional (no-op when missing) |
 
 ## Phase status
@@ -554,6 +554,102 @@ concept_map/{subject}/{Subject} [Concept Maps].pdf
 - **PYQ extraction + seed** → after Questions seeded.
 - **Library search ranking** (Phase 2.3 used basic ilike) — full-text
   search with tsvector if scale demands it.
+
+## BYOK — bring-your-own-key (post-v1.1 ship)
+
+The community demo exposed the failure mode of a shared free-tier key: one
+Gemini / Groq project = ~20 RPM = instant 429s when 20 community members
+hit it simultaneously. Switched architecture to per-user keys.
+
+### Model
+
+- Three nullable text columns on `profiles`: `gemini_api_key`, `groq_api_key`,
+  `anthropic_api_key`. Plus `ai_key_prompt_dismissed_at timestamptz`.
+- Existing RLS (`profiles.id = auth.uid()`) already restricts read/write to
+  the owner. Service-role bypasses RLS — only used in `start-action.ts`.
+- Migration: `supabase/migrations/20260629_byok_ai_keys.sql`.
+
+### Provider abstraction
+
+- `lib/ai/provider.ts` no longer caches singleton clients. `callPlanGen` /
+  `callChat` accept `keys?: AiKeys` (per-call) and instantiate a fresh SDK
+  client each call. SDK constructors are config holders — zero overhead.
+- Priority unchanged: Gemini > Anthropic > Groq. With BYOK, the resolver
+  reads `keys` first, falls back to `process.env.*` (admin / dev override).
+- New `NoAiKeyError` is thrown when ALL of `keys.* || env.*` are empty.
+  Callers catch and return `{ needsAiKey: true }` so the UI surfaces the
+  Connect-AI prompt instead of a generic error banner.
+
+### File map
+
+```
+lib/ai/
+  provider.ts             AiKeys type, NoAiKeyError, callPlanGen/callChat
+                           accept keys: AiKeys?, env fallback only.
+  get-user-keys.ts        getAiKeysForUser(userId) → AiKeys from profile.
+
+app/(app)/settings/
+  actions.ts              saveAiKeyAction({ provider, key }) +
+                           dismissAiKeyPromptAction()
+  intelligence-hub.tsx    "Intelligence Hub" section — 3 provider cards
+                           (Gemini recommended, Groq free, Anthropic paid).
+                           Password input + show/hide + Save + "Get key →".
+                           Renders PRIMARY badge on the active provider.
+  settings-client.tsx     IntelligenceHubSection now first in section list.
+
+app/(app)/today/
+  page.tsx                Reads profile.{gemini,groq,anthropic}_api_key +
+                           ai_key_prompt_dismissed_at; passes hasAiKey +
+                           aiKeyPromptDismissed to TodayClient.
+  today-client.tsx        Renders NoAiKeyBanner when !hasAiKey, and the
+                           AiKeyPrompt modal when also not dismissed.
+  components/ai-key-prompt.tsx
+                          Full-screen first-load modal + small inline
+                           reminder banner. Modal reloads the page on save.
+
+lib/groq/
+  generate-plan.ts        Loads userKeys via getAiKeysForUser, threads to
+                           callPlanGen. Catches NoAiKeyError → returns
+                           { ok: false, needsAiKey: true }.
+  chat.ts                 sendChatMessage accepts keys?: AiKeys.
+
+app/(app)/chat/actions.ts Loads userKeys, threads to sendChatMessage,
+                           catches NoAiKeyError + sanitizeProviderError.
+```
+
+### sanitizeProviderError (expanded for BYOK)
+
+`lib/groq/generate-plan.ts` exports `sanitizeProviderError(raw)` — used by
+both plan-gen fallback and chat error path. Patterns now catch:
+- Quota / rate limit: `429`, `quota`, `rate limit`, `rate_limit`, `resource_exhausted`
+- 5xx upstream errors
+- Auth: `401`, `403`, `invalid api key`, `unauthorized`, `api_key_invalid`, `api key not valid`
+
+Never returns more than ~120 chars; never leaks JSON or org identifiers.
+
+### Locked invariants
+
+- **Per-call keys, no singleton cache.** SDK clients are cheap to construct.
+  Caching a global client breaks BYOK isolation (one user's quota would be
+  shared across all sessions on the same Vercel worker).
+- **`AiKeys` reads from profile, falls back to env.** Env vars become an
+  admin escape hatch — they no longer have to be set for the app to work.
+- **`saveAiKeyAction` accepts empty string to clear** a key (sets column
+  to NULL). Validates length ≥ 10 only when non-empty.
+- **Settings UI never echoes a stored key by default.** Field type is
+  `password` with a show/hide eye toggle. Replace re-enters edit mode.
+- **AiKeyPrompt reloads on save** (`window.location.reload()`) so server
+  components re-fetch with the new key cleanly — avoids stale React state.
+- **NoAiKeyBanner is always shown when !hasAiKey** even after dismiss; the
+  popup is dismissible but the inline reminder isn't. Dismiss only stops
+  the full-screen modal from auto-opening.
+
+### Why not encrypt the keys at rest?
+
+Considered, deferred. RLS already restricts reads to owner-only; the only
+threat model encryption would address is "Supabase DB dump leaks." For a
+closed community build that's acceptable risk. If we go public, revisit
+with `pgcrypto` symmetric encryption keyed by a server-only secret.
 
 ## AI Chat (Phase 9)
 

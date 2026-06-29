@@ -1,6 +1,6 @@
 import "server-only";
 
-import { callChat, type ChatMsg } from "@/lib/ai/provider";
+import { callChat, type AiKeys, type ChatMsg } from "@/lib/ai/provider";
 
 // Re-export for callers that imported the old type name.
 export type ChatMessage = ChatMsg;
@@ -73,12 +73,14 @@ export async function sendChatMessage(args: {
   systemContext: string;
   history: ChatMessage[];
   userMessage: string;
+  keys?: AiKeys | null;
 }): Promise<string> {
   return await callChat({
     system: CHAT_SYSTEM_PROMPT,
     history: args.history,
     userMessage: `[CONTEXT]\n${args.systemContext}\n[/CONTEXT]\n\n${args.userMessage}`,
     maxTokens: 700,
+    keys: args.keys,
   });
 }
 

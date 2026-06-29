@@ -649,6 +649,8 @@ export type Database = {
       }
       profiles: {
         Row: {
+          ai_key_prompt_dismissed_at: string | null
+          anthropic_api_key: string | null
           batch: string | null
           best_streak: number | null
           chronotype: Database["public"]["Enums"]["chronotype_t"] | null
@@ -661,7 +663,9 @@ export type Database = {
           day_boundary_time: string | null
           exam_date: string | null
           first_name: string | null
+          gemini_api_key: string | null
           goal: Database["public"]["Enums"]["goal_type"] | null
+          groq_api_key: string | null
           id: string
           last_active_at: string | null
           onboarding_completed_at: string | null
@@ -675,6 +679,8 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          ai_key_prompt_dismissed_at?: string | null
+          anthropic_api_key?: string | null
           batch?: string | null
           best_streak?: number | null
           chronotype?: Database["public"]["Enums"]["chronotype_t"] | null
@@ -687,7 +693,9 @@ export type Database = {
           day_boundary_time?: string | null
           exam_date?: string | null
           first_name?: string | null
+          gemini_api_key?: string | null
           goal?: Database["public"]["Enums"]["goal_type"] | null
+          groq_api_key?: string | null
           id: string
           last_active_at?: string | null
           onboarding_completed_at?: string | null
@@ -701,6 +709,8 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          ai_key_prompt_dismissed_at?: string | null
+          anthropic_api_key?: string | null
           batch?: string | null
           best_streak?: number | null
           chronotype?: Database["public"]["Enums"]["chronotype_t"] | null
@@ -713,7 +723,9 @@ export type Database = {
           day_boundary_time?: string | null
           exam_date?: string | null
           first_name?: string | null
+          gemini_api_key?: string | null
           goal?: Database["public"]["Enums"]["goal_type"] | null
+          groq_api_key?: string | null
           id?: string
           last_active_at?: string | null
           onboarding_completed_at?: string | null

@@ -25,6 +25,49 @@ async function updateProfile(userId: string, patch: TablesUpdate<"profiles">) {
   return error;
 }
 
+// ============================================================
+// AI keys (BYOK)
+// ============================================================
+// Save / replace the user's AI provider key. Empty string clears it.
+// Validates rough shape only — actual auth happens at the next AI call.
+export type SaveAiKeyResult = { error: string | null; saved?: boolean };
+
+export async function saveAiKeyAction(args: {
+  provider: "gemini" | "groq" | "anthropic";
+  key: string;
+}): Promise<SaveAiKeyResult> {
+  const { user } = await requireUser();
+  const trimmed = (args.key ?? "").trim();
+  // Allow empty string to clear the key.
+  if (trimmed.length > 0 && trimmed.length < 10) {
+    return { error: "That looks too short to be a valid key. Double-check and paste again." };
+  }
+  const column =
+    args.provider === "gemini"
+      ? "gemini_api_key"
+      : args.provider === "groq"
+        ? "groq_api_key"
+        : "anthropic_api_key";
+
+  const patch: TablesUpdate<"profiles"> = {
+    [column]: trimmed.length === 0 ? null : trimmed,
+  };
+  const err = await updateProfile(user.id, patch);
+  if (err) return { error: err.message };
+  return { error: null, saved: true };
+}
+
+// Marks the first-load "Connect AI" prompt as dismissed. The user can
+// still add keys via Settings; this just stops the popup from re-appearing.
+export async function dismissAiKeyPromptAction(): Promise<{ error: string | null }> {
+  const { user } = await requireUser();
+  const err = await updateProfile(user.id, {
+    ai_key_prompt_dismissed_at: new Date().toISOString(),
+  });
+  if (err) return { error: err.message };
+  return { error: null };
+}
+
 function deriveChronotype(windows: TimeWindow[]) {
   const hasMorning = windows.includes("morning");
   const hasNight = windows.includes("night");

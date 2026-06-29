@@ -3,6 +3,9 @@
 import { redirect } from "next/navigation";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { sendChatMessage, type ChatMessage } from "@/lib/groq/chat";
+import { NoAiKeyError } from "@/lib/ai/provider";
+import { getAiKeysForUser } from "@/lib/ai/get-user-keys";
+import { sanitizeProviderError } from "@/lib/groq/generate-plan";
 import { getCurrentPlanDate, getFirstPlanDate } from "@/lib/utils/day-boundary";
 import type { Tables } from "@/lib/supabase/database.types";
 
@@ -26,7 +29,7 @@ async function requireUser() {
 export async function sendChatTurnAction(args: {
   history: ChatMessage[];
   userMessage: string;
-}): Promise<{ reply: string | null; error: string | null }> {
+}): Promise<{ reply: string | null; error: string | null; needsAiKey?: boolean }> {
   const { supabase, user } = await requireUser();
 
   // Build a compact context snapshot.
@@ -143,16 +146,26 @@ export async function sendChatTurnAction(args: {
   );
 
   try {
+    const userKeys = await getAiKeysForUser(user.id);
     const reply = await sendChatMessage({
       systemContext,
       history: args.history.slice(-12), // last 6 turns, ~12 messages
       userMessage: args.userMessage,
+      keys: userKeys,
     });
     if (!reply) return { reply: null, error: "Empty response — try again." };
     return { reply, error: null };
   } catch (err) {
-    const msg = err instanceof Error ? err.message : "Couldn't reach the assistant.";
-    return { reply: null, error: msg };
+    if (err instanceof NoAiKeyError) {
+      return {
+        reply: null,
+        error: "Connect an AI provider key in Settings to chat.",
+        needsAiKey: true,
+      };
+    }
+    // sanitizeProviderError keeps raw 429 / rate-limit JSON out of the chat bubble.
+    const raw = err instanceof Error ? err.message : "Couldn't reach the assistant.";
+    return { reply: null, error: sanitizeProviderError(raw) };
   }
 }
 

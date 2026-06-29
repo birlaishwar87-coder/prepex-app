@@ -10,6 +10,7 @@ import { TaskDetailModal } from "./components/task-detail-modal";
 import { AddTaskModal } from "./components/add-task-modal";
 import { RegenerateModal } from "./components/regenerate-modal";
 import { FallbackBanner } from "./components/fallback-banner";
+import { AiKeyPrompt, NoAiKeyBanner } from "./components/ai-key-prompt";
 import {
   RevisionSession,
   type RevisionTarget,
@@ -34,6 +35,10 @@ interface TodayClientProps {
   revisionTopicStateByChapter: Record<string, string>;
   /** chapter_id → chapter row (name, subject) for fast lookup. */
   chapterMetaById: Record<string, { name: string; subject: "physics" | "chemistry" | "maths" }>;
+  /** BYOK: true when user has at least one AI provider key on their profile. */
+  hasAiKey: boolean;
+  /** BYOK: true when the first-load AI key prompt has already been dismissed. */
+  aiKeyPromptDismissed: boolean;
 }
 
 export function TodayClient({
@@ -50,6 +55,8 @@ export function TodayClient({
   fallbackReason,
   revisionTopicStateByChapter,
   chapterMetaById,
+  hasAiKey,
+  aiKeyPromptDismissed,
 }: TodayClientProps) {
   // Show check-in modal automatically on first load if no checkin row exists.
   const [checkinOpen, setCheckinOpen] = useState(!checkinExists);
@@ -57,6 +64,11 @@ export function TodayClient({
   const [addOpen, setAddOpen] = useState(false);
   const [regenOpen, setRegenOpen] = useState(false);
   const [revisionTarget, setRevisionTarget] = useState<RevisionTarget | null>(null);
+  // BYOK: first-load prompt shows when user has no key AND hasn't dismissed.
+  // The prompt itself reloads on save and writes dismissed_at on skip.
+  const [aiKeyPromptOpen, setAiKeyPromptOpen] = useState(
+    !hasAiKey && !aiKeyPromptDismissed
+  );
 
   function onStartRevision(task: Task) {
     // Only route to RevisionSession if we have a topic_state for this chapter.
@@ -118,6 +130,10 @@ export function TodayClient({
         </div>
         <Pill leftIcon={<Calendar size={12} />}>{planDateLabel}</Pill>
       </div>
+
+      {!hasAiKey && (
+        <NoAiKeyBanner onConnect={() => setAiKeyPromptOpen(true)} />
+      )}
 
       {fallback && <FallbackBanner reason={fallbackReason} />}
 
@@ -206,6 +222,9 @@ export function TodayClient({
       <AddTaskModal open={addOpen} onClose={() => setAddOpen(false)} />
       <RegenerateModal open={regenOpen} onClose={() => setRegenOpen(false)} />
       <RevisionSession target={revisionTarget} onClose={() => setRevisionTarget(null)} />
+      {aiKeyPromptOpen && (
+        <AiKeyPrompt onConnected={() => setAiKeyPromptOpen(false)} />
+      )}
     </>
   );
 }

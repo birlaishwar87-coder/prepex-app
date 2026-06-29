@@ -8,7 +8,8 @@ import {
   PlanValidationError,
   validateGroqOutput,
 } from "./types";
-import { callPlanGen, activeProviderName } from "@/lib/ai/provider";
+import { callPlanGen, activeProviderName, NoAiKeyError } from "@/lib/ai/provider";
+import { getAiKeysForUser } from "@/lib/ai/get-user-keys";
 import { getSupabaseServerClient } from "@/lib/supabase/server";
 import type { Tables, TablesInsert, TablesUpdate, Json } from "@/lib/supabase/database.types";
 
@@ -44,6 +45,9 @@ export type GenerateResult =
   | {
       ok: false;
       error: string;
+      /** Set when the user hasn't added any AI key yet — UI surfaces the
+       *  Connect-AI prompt instead of a generic error banner. */
+      needsAiKey?: boolean;
     };
 
 export async function generateDailyPlan(opts: GenerateOptions): Promise<GenerateResult> {
@@ -86,27 +90,45 @@ export async function generateDailyPlan(opts: GenerateOptions): Promise<Generate
     return { ok: true, plan: existing, tasks: tasks ?? [] };
   }
 
-  // 3. Call the AI provider with our context.
+  // 3. Call the AI provider with our context. BYOK: load user keys first.
+  const userKeys = await getAiKeysForUser(opts.userId);
   let groqOutput: GroqPlanOutput | null = null;
   let groqError: string | null = null;
+  let needsAiKey = false;
   try {
     const raw = await callPlanGen({
       system: PLAN_SYSTEM_PROMPT,
       userJson: JSON.stringify(context),
+      keys: userKeys,
     });
     let parsed: unknown;
     try {
       parsed = JSON.parse(raw);
     } catch {
-      throw new Error(`${activeProviderName()} returned non-JSON output`);
+      throw new Error(`${activeProviderName(userKeys)} returned non-JSON output`);
     }
     groqOutput = validateGroqOutput(parsed);
   } catch (err) {
-    if (err instanceof PlanValidationError) {
+    if (err instanceof NoAiKeyError) {
+      // No key configured — special path. Don't fall back to yesterday's
+      // plan; instead bubble up so the UI shows the Connect-AI prompt.
+      needsAiKey = true;
+      groqError = "AI key not connected.";
+    } else if (err instanceof PlanValidationError) {
       groqError = `validation: ${err.message}`;
     } else {
       groqError = errorMessage(err, "AI call failed");
     }
+  }
+
+  // Short-circuit: no key set at all → bubble up the dedicated error
+  // so the today page can render the Connect-AI prompt cleanly.
+  if (needsAiKey) {
+    return {
+      ok: false,
+      error: "Connect an AI provider key in Settings to enable plans.",
+      needsAiKey: true,
+    };
   }
 
   if (!groqOutput) {
@@ -278,17 +300,25 @@ export function sanitizeProviderError(raw: string | null | undefined): string {
   if (!raw) return "AI provider unavailable.";
   const m = raw.toLowerCase();
 
-  // Groq / OpenAI-compatible 429 — rate limit / quota
-  if (m.includes("rate limit") || m.includes("rate_limit") || m.includes("429") || m.includes("quota")) {
-    return "Daily AI quota reached. Tomorrow refreshes automatically, or upgrade the AI tier to lift the cap.";
+  // Quota / rate-limit — Groq 429, Gemini "RESOURCE_EXHAUSTED" / "quota exceeded",
+  // Anthropic 429 / "rate_limit_error".
+  if (
+    m.includes("rate limit") ||
+    m.includes("rate_limit") ||
+    m.includes("429") ||
+    m.includes("quota") ||
+    m.includes("resource_exhausted") ||
+    m.includes("resource exhausted")
+  ) {
+    return "Your AI quota is full for now. It resets soon. You can also add a different key in Settings to switch providers.";
   }
   // 5xx — upstream brown-out
   if (/\b50\d\b/.test(m) || m.includes("internal server") || m.includes("bad gateway") || m.includes("gateway timeout")) {
-    return "The planning service is temporarily down. We'll retry on the next regenerate.";
+    return "The AI service is temporarily down. Tap Regenerate in a minute to retry.";
   }
   // Auth — wrong key
-  if (m.includes("401") || m.includes("403") || m.includes("invalid api key") || m.includes("unauthorized")) {
-    return "AI service key isn't accepted. Check the settings on the server.";
+  if (m.includes("401") || m.includes("403") || m.includes("invalid api key") || m.includes("unauthorized") || m.includes("api_key_invalid") || m.includes("api key not valid")) {
+    return "Your AI key isn't being accepted. Open Settings → Intelligence Hub and paste a fresh one.";
   }
   // Network — DNS/connection refused
   if (m.includes("enotfound") || m.includes("econnrefused") || m.includes("network") || m.includes("fetch failed")) {

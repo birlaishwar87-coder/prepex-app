@@ -5,18 +5,30 @@ import { GoogleGenAI } from "@google/genai";
 import Groq from "groq-sdk";
 
 // ============================================================
-// AI Provider abstraction
+// AI Provider abstraction — BYOK aware
 // ============================================================
 //
-// Three providers, picked at runtime by env-var presence in priority order:
+// Each user brings their own API key (BYOK), stored on their profile.
+// Callers pass `keys` from the user's profile. If no `keys` passed (or
+// all empty), we fall back to env-level keys for admin / dev use.
 //
-//   1. Google Gemini     (when GEMINI_API_KEY is set — generous free tier)
-//   2. Anthropic Claude  (when ANTHROPIC_API_KEY is set)
-//   3. Groq llama        (default, free but small daily cap)
-//
-// All three have compatible chat/plan patterns, so callers don't care
-// which one is active. We expose two helpers: callPlanGen() for the
-// strict-JSON planner, and callChat() for free-form conversation.
+// Priority order:
+//   1. Google Gemini    (Gemini 2.5 Flash) — free tier per user
+//   2. Anthropic Claude (claude-haiku-4-5)
+//   3. Groq llama       (default fallback)
+
+export type AiKeys = {
+  gemini?: string | null;
+  groq?: string | null;
+  anthropic?: string | null;
+};
+
+export class NoAiKeyError extends Error {
+  constructor() {
+    super("No AI provider key configured for this user.");
+    this.name = "NoAiKeyError";
+  }
+}
 
 export const GEMINI_PLAN_MODEL =
   process.env.GEMINI_PLAN_MODEL || "gemini-2.5-flash";
@@ -31,45 +43,35 @@ export const ANTHROPIC_CHAT_MODEL =
 export const GROQ_PLAN_MODEL = "llama-3.3-70b-versatile" as const;
 export const GROQ_CHAT_MODEL = "llama-3.3-70b-versatile" as const;
 
-export function isGeminiEnabled(): boolean {
-  return !!process.env.GEMINI_API_KEY;
+type ResolvedProvider =
+  | { name: "gemini"; key: string }
+  | { name: "anthropic"; key: string }
+  | { name: "groq"; key: string }
+  | { name: "none" };
+
+/** Resolve which provider to use for this call. */
+function resolveProvider(keys?: AiKeys | null): ResolvedProvider {
+  const gemini = keys?.gemini?.trim() || process.env.GEMINI_API_KEY?.trim();
+  if (gemini) return { name: "gemini", key: gemini };
+  const anthropic =
+    keys?.anthropic?.trim() || process.env.ANTHROPIC_API_KEY?.trim();
+  if (anthropic) return { name: "anthropic", key: anthropic };
+  const groq = keys?.groq?.trim() || process.env.GROQ_API_KEY?.trim();
+  if (groq) return { name: "groq", key: groq };
+  return { name: "none" };
 }
 
+/**
+ * Public helper — what provider would be used for a given user?
+ * Used by the Settings UI to show the "PRIMARY" badge on the right card.
+ */
+export function activeProviderName(keys?: AiKeys | null): "gemini" | "anthropic" | "groq" | "none" {
+  return resolveProvider(keys).name;
+}
+
+// Legacy helper kept for backward compat (used by error messages elsewhere)
 export function isAnthropicEnabled(): boolean {
   return !!process.env.ANTHROPIC_API_KEY;
-}
-
-export function activeProviderName(): "gemini" | "anthropic" | "groq" {
-  if (isGeminiEnabled()) return "gemini";
-  if (isAnthropicEnabled()) return "anthropic";
-  return "groq";
-}
-
-let geminiClient: GoogleGenAI | null = null;
-function getGemini(): GoogleGenAI {
-  if (geminiClient) return geminiClient;
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error("GEMINI_API_KEY missing — provider abstraction misrouted");
-  geminiClient = new GoogleGenAI({ apiKey });
-  return geminiClient;
-}
-
-let groqClient: Groq | null = null;
-function getGroq(): Groq {
-  if (groqClient) return groqClient;
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) throw new Error("GROQ_API_KEY missing in .env.local");
-  groqClient = new Groq({ apiKey });
-  return groqClient;
-}
-
-let anthropicClient: Anthropic | null = null;
-function getAnthropic(): Anthropic {
-  if (anthropicClient) return anthropicClient;
-  const apiKey = process.env.ANTHROPIC_API_KEY;
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY missing — provider abstraction misrouted");
-  anthropicClient = new Anthropic({ apiKey });
-  return anthropicClient;
 }
 
 // ============================================================
@@ -78,9 +80,16 @@ function getAnthropic(): Anthropic {
 export async function callPlanGen(args: {
   system: string;
   userJson: string;
+  keys?: AiKeys | null;
 }): Promise<string> {
-  if (isGeminiEnabled()) {
-    const ai = getGemini();
+  const provider = resolveProvider(args.keys);
+
+  if (provider.name === "none") {
+    throw new NoAiKeyError();
+  }
+
+  if (provider.name === "gemini") {
+    const ai = new GoogleGenAI({ apiKey: provider.key });
     const response = await ai.models.generateContent({
       model: GEMINI_PLAN_MODEL,
       contents: args.userJson,
@@ -94,8 +103,8 @@ export async function callPlanGen(args: {
     return stripJsonFences((response.text ?? "").trim());
   }
 
-  if (isAnthropicEnabled()) {
-    const client = getAnthropic();
+  if (provider.name === "anthropic") {
+    const client = new Anthropic({ apiKey: provider.key });
     const message = await client.messages.create({
       model: ANTHROPIC_PLAN_MODEL,
       max_tokens: 4096,
@@ -116,8 +125,8 @@ export async function callPlanGen(args: {
     return stripJsonFences(text);
   }
 
-  // Default: Groq
-  const groq = getGroq();
+  // Groq
+  const groq = new Groq({ apiKey: provider.key });
   const completion = await groq.chat.completions.create({
     model: GROQ_PLAN_MODEL,
     response_format: { type: "json_object" },
@@ -142,11 +151,16 @@ export async function callChat(args: {
   history: ChatMsg[];
   userMessage: string;
   maxTokens?: number;
+  keys?: AiKeys | null;
 }): Promise<string> {
-  if (isGeminiEnabled()) {
-    const ai = getGemini();
-    // Gemini uses role: 'model' for assistant turns (not 'assistant')
-    // and a parts: [{ text }] shape for content.
+  const provider = resolveProvider(args.keys);
+
+  if (provider.name === "none") {
+    throw new NoAiKeyError();
+  }
+
+  if (provider.name === "gemini") {
+    const ai = new GoogleGenAI({ apiKey: provider.key });
     const contents = [
       ...args.history.map((m) => ({
         role: m.role === "assistant" ? "model" : "user",
@@ -166,8 +180,8 @@ export async function callChat(args: {
     return (response.text ?? "").trim();
   }
 
-  if (isAnthropicEnabled()) {
-    const client = getAnthropic();
+  if (provider.name === "anthropic") {
+    const client = new Anthropic({ apiKey: provider.key });
     const message = await client.messages.create({
       model: ANTHROPIC_CHAT_MODEL,
       max_tokens: args.maxTokens ?? 700,
@@ -185,7 +199,8 @@ export async function callChat(args: {
       .trim();
   }
 
-  const groq = getGroq();
+  // Groq
+  const groq = new Groq({ apiKey: provider.key });
   const completion = await groq.chat.completions.create({
     model: GROQ_CHAT_MODEL,
     temperature: 0.7,
@@ -200,7 +215,6 @@ export async function callChat(args: {
 }
 
 function stripJsonFences(s: string): string {
-  // ```json\n{...}\n```   →   {...}
   const fence = /^```(?:json)?\s*([\s\S]*?)\s*```$/i;
   const m = s.match(fence);
   return m ? m[1].trim() : s;

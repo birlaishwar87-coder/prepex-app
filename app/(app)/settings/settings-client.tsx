@@ -27,6 +27,7 @@ import {
   saveProfileAction,
 } from "./actions";
 import { DeleteAccountModal } from "./delete-account-modal";
+import { IntelligenceHubSection } from "./intelligence-hub";
 
 type Profile = Tables<"profiles">;
 
@@ -36,6 +37,11 @@ const BATCHES = ["Foundation", "Dropper", "Test Series", "Other"];
 export function SettingsClient({ profile }: { profile: Profile }) {
   return (
     <div className="flex flex-col gap-6">
+      <IntelligenceHubSection
+        geminiKey={profile.gemini_api_key}
+        groqKey={profile.groq_api_key}
+        anthropicKey={profile.anthropic_api_key}
+      />
       <ProfileSection profile={profile} />
       <GoalSection profile={profile} />
       <ExamSection profile={profile} />

@@ -244,6 +244,14 @@ export default async function TodayPage() {
   const daysToExam =
     profile.exam_date != null ? Math.max(0, daysBetween(planDate, profile.exam_date)) : null;
 
+  // BYOK: prompt show/hide flags derived from profile.
+  const hasAiKey = !!(
+    profile.gemini_api_key ||
+    profile.groq_api_key ||
+    profile.anthropic_api_key
+  );
+  const aiKeyPromptDismissed = !!profile.ai_key_prompt_dismissed_at;
+
   const rightPanelData: RightPanelData = {
     streak: profile.streak_count ?? 0,
     bestStreak: profile.best_streak ?? 0,
@@ -305,6 +313,8 @@ export default async function TodayPage() {
             }
             revisionTopicStateByChapter={revisionTopicStateByChapter}
             chapterMetaById={chapterMetaById}
+            hasAiKey={hasAiKey}
+            aiKeyPromptDismissed={aiKeyPromptDismissed}
           />
         );
       }
@@ -329,6 +339,8 @@ export default async function TodayPage() {
       chapterMetaById={chapterMetaById}
       fallback={generationFallback}
       fallbackReason={generationFallbackReason}
+      hasAiKey={hasAiKey}
+      aiKeyPromptDismissed={aiKeyPromptDismissed}
     />
   );
 }
@@ -351,6 +363,8 @@ function TodayPageRenderer(props: {
   fallbackReason: string | null;
   revisionTopicStateByChapter: Record<string, string>;
   chapterMetaById: Record<string, { name: string; subject: "physics" | "chemistry" | "maths" }>;
+  hasAiKey: boolean;
+  aiKeyPromptDismissed: boolean;
 }) {
   return (
     <div className="grid gap-7 xl:grid-cols-[1fr_320px]">
@@ -371,6 +385,8 @@ function TodayPageRenderer(props: {
           fallbackReason={props.fallbackReason}
           revisionTopicStateByChapter={props.revisionTopicStateByChapter}
           chapterMetaById={props.chapterMetaById}
+          hasAiKey={props.hasAiKey}
+          aiKeyPromptDismissed={props.aiKeyPromptDismissed}
         />
       </div>
       <aside className="hidden xl:block">
